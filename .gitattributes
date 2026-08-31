@@ -1,0 +1,8 @@
+# Normalize repository text files to LF so Windows checkouts do not produce
+# noisy conversion warnings during add/checkout operations.
+* text=auto eol=lf
+
+# Windows command scripts remain CRLF when checked out because cmd.exe expects
+# the native convention, while their repository representation is normalized.
+*.bat text eol=crlf
+*.cmd text eol=crlf

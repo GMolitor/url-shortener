@@ -1,0 +1,28 @@
+# Java/Gradle
+.gradle/
+**/.gradle-user-home/
+build/
+out/
+
+# Node
+node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+
+# Local configuration and data
+.env
+.env.*
+!.env.example
+data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# OS files
+.DS_Store
+Thumbs.db

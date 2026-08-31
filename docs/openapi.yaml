@@ -1,0 +1,157 @@
+openapi: 3.1.0
+info:
+  title: URL Shortener API
+  version: 1.0.0
+  description: Local/trusted-demo API contract for the greenfield URL shortener prototype.
+servers:
+  - url: http://localhost:8080
+    description: Default local server; generated URLs use PUBLIC_ORIGIN.
+tags:
+  - name: Links
+  - name: Health
+paths:
+  /api/links:
+    post:
+      operationId: createLink
+      tags: [Links]
+      summary: Create a short link
+      description: Accepts HTTP/HTTPS, persists the mapping, and never fetches or proxies the destination. Each valid request creates a new mapping.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLinkRequest'
+      responses:
+        '201':
+          description: Link created and persisted
+          headers:
+            Location:
+              schema: { type: string, format: uri }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreateLinkResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '413': { $ref: '#/components/responses/ContentTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+      x-limits:
+        maxRequestBodyBytes: 4096
+        maxUrlCharacters: 2048
+  /{code}:
+    get:
+      operationId: redirectToDestination
+      tags: [Links]
+      summary: Redirect to a destination
+      parameters:
+        - $ref: '#/components/parameters/Code'
+      responses:
+        '302':
+          description: Known code redirected
+          headers:
+            Location:
+              required: true
+              schema: { type: string, format: uri }
+            Cache-Control:
+              required: true
+              schema: { type: string, example: no-store }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /actuator/health:
+    get:
+      operationId: getHealth
+      tags: [Health]
+      summary: Read application and SQLite health
+      responses:
+        '200':
+          description: Healthy
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthResponse' }
+        '503':
+          description: Unhealthy or unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthResponse' }
+components:
+  parameters:
+    Code:
+      name: code
+      in: path
+      required: true
+      description: Seven-character, case-sensitive Base62 code
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9]{7}$'
+        minLength: 7
+        maxLength: 7
+  schemas:
+    CreateLinkRequest:
+      type: object
+      additionalProperties: false
+      required: [url]
+      properties:
+        url:
+          type: string
+          format: uri
+          minLength: 1
+          maxLength: 2048
+          description: HTTP or HTTPS URL without embedded credentials or controls
+    CreateLinkResponse:
+      type: object
+      additionalProperties: false
+      required: [code, shortUrl, destinationUrl, createdAt]
+      properties:
+        code: { type: string, pattern: '^[A-Za-z0-9]{7}$' }
+        shortUrl:
+          type: string
+          format: uri
+          description: Built from PUBLIC_ORIGIN, never request host headers
+        destinationUrl: { type: string, format: uri }
+        createdAt:
+          type: string
+          format: date-time
+          description: UTC RFC-3339 instant with Z offset
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [status, errorCode, message, requestId, timestamp]
+      properties:
+        status: { type: integer, minimum: 400, maximum: 599 }
+        errorCode:
+          type: string
+          enum: [INVALID_REQUEST, INVALID_URL, CODE_NOT_FOUND, REQUEST_TOO_LARGE, UNSUPPORTED_MEDIA_TYPE, STORAGE_FAILURE, SERVICE_UNAVAILABLE]
+        message: { type: string, description: Safe message without stack traces or SQL details }
+        requestId: { type: string }
+        timestamp: { type: string, format: date-time, description: UTC RFC-3339 instant with Z offset }
+    HealthResponse:
+      type: object
+      properties:
+        status: { type: string, enum: [UP, DOWN] }
+        components: { type: object, additionalProperties: true }
+  responses:
+    BadRequest:
+      description: INVALID_REQUEST for malformed JSON/missing or unknown fields; INVALID_URL for a rejected destination URL; INVALID_REQUEST for an invalid code path
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    NotFound:
+      description: CODE_NOT_FOUND because the code does not exist
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    ContentTooLarge:
+      description: REQUEST_TOO_LARGE because the request exceeds 4096 bytes or the URL exceeds 2048 characters
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    UnsupportedMediaType:
+      description: UNSUPPORTED_MEDIA_TYPE because Content-Type is not application/json
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    ServerError:
+      description: STORAGE_FAILURE for persistence failure; unexpected failures use the same safe server-error envelope
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    ServiceUnavailable:
+      description: SERVICE_UNAVAILABLE because the service or database is unavailable
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+x-contract:
+  publicOrigin: PUBLIC_ORIGIN
+  corsOrigin: configured local frontend origin
+  generatedCodeReservedPrefixes: [/api, /actuator, /assets]
+  redirectStatus: 302
+  redirectCacheControl: no-store
