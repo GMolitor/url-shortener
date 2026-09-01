@@ -21,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -73,6 +74,23 @@ class LinkControllerTest {
                 .andExpect(jsonPath("$.errorCode").value("INVALID_URL"))
                 .andExpect(jsonPath("$.requestId").isNotEmpty())
                 .andExpect(jsonPath("$.timestamp").isNotEmpty());
+    }
+
+    @Test
+    void returnsCorrelatedControlledErrorForStorageFailure() throws Exception {
+        when(creationService.create(anyString()))
+                .thenThrow(new DataAccessResourceFailureException("private database details"));
+
+        mockMvc.perform(post("/api/links")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"url\":\"https://example.com/path\"}")
+                        .header(RequestIdFilter.REQUEST_ID_HEADER, "client-supplied-id"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(header().string(RequestIdFilter.REQUEST_ID_HEADER, org.hamcrest.Matchers.not("client-supplied-id")))
+                .andExpect(jsonPath("$.errorCode").value("STORAGE_FAILURE"))
+                .andExpect(jsonPath("$.requestId").isNotEmpty())
+                .andExpect(jsonPath("$.message").value("Storage operation failed"))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("private database details"))));
     }
 
     @Test

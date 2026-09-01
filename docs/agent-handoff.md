@@ -76,3 +76,15 @@ defines create, redirect, and health operations; payloads; stable errors;
 validation/body limits; 302 and `no-store` redirect behavior; and the
 configured public-origin and CORS boundary. T05/T08/T09 may implement against
 it without changing the contract.
+
+## T14 status
+
+T14 is complete. The backend emits correlation-safe structured access logs with
+method, path, status, duration, and request ID, and logs storage and unexpected
+failures without exception messages, destination URLs, or SQL details. Request
+IDs are assigned before downstream filters and returned in the response header
+and error envelope. Actuator reports application and SQLite health, code
+allocation retries remain bounded, and graceful shutdown is enabled with a
+ten-second shutdown phase. Failure handling, health, and shutdown behavior are
+covered by backend tests, including storage-failure injection and context-close
+validation.

@@ -23,12 +23,14 @@ class RestartPersistenceIntegrationTest {
         Path database = Files.createTempFile("url-shortener-t12-restart-", ".sqlite");
         try {
             String code;
-            try (ConfigurableApplicationContext first = start(database)) {
+            ConfigurableApplicationContext first = start(database);
+            try (first) {
                 int port = port(first);
                 HttpResponse<String> response = postCreate(port, "https://example.com/restart");
                 assertThat(response.statusCode()).isEqualTo(201);
                 code = extractCode(response.body());
             }
+            assertThat(first.isActive()).isFalse();
 
             try (ConfigurableApplicationContext second = start(database)) {
                 int port = port(second);

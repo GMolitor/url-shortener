@@ -45,6 +45,11 @@ Flyway migration infrastructure is configured and runs automatically at backend
 startup. T06 will add the first business migration, `V1__create_links.sql`,
 defined by the approved data-model contract.
 
+If startup reports `Migration checksum mismatch`, the local SQLite file was
+created from a different migration revision. Stop the backend, back up and
+remove the configured database file, then restart so Flyway can recreate the
+local schema. Do not edit an already-applied migration or disable validation.
+
 ## Validation
 
 Backend:

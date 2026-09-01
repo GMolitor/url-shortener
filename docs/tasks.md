@@ -26,16 +26,16 @@ T15,T16 -> T17 Release readiness
 - **T02 Architecture finalization**: incorporate adversarial findings and close Critical/High issues. **Approved.**
 - **T03 Data model**: define schema, indexes, constraints, timestamps, code capacity, and versioned migrations. **Complete.**
 - **T04 API definitions**: publish OpenAPI, payloads, error envelope, validation, redirect, and public-origin behavior. **Approved.**
-- **T05 Project foundation**: establish build, frontend, configuration, migration framework, health, tooling, and docs.
-- **T06 Persistence**: implement link repository, mapping migration, SQLite behavior, and persistence tests.
-- **T07 Domain/code generation**: implement URL policy, secure codes, reserved paths, and bounded retries.
-- **T08 Backend API**: implement creation, redirect, health, validation, error handling, and configured-origin behavior.
-- **T09 React UI**: implement the approved create-link workflow and failure states.
+- **T05 Project foundation**: establish build, frontend, configuration, migration framework, health, tooling, and docs. **Complete.**
+- **T06 Persistence**: implement link repository, mapping migration, SQLite behavior, and persistence tests. **Complete.**
+- **T07 Domain/code generation**: implement URL policy, secure codes, reserved paths, and bounded retries. **Complete.**
+- **T08 Backend API**: implement creation, redirect, health, validation, error handling, and configured-origin behavior. **Complete.**
+- **T09 React UI**: implement the approved create-link workflow and failure states. **Complete.**
 - **T10 Backend unit tests**: cover validation, generator, collision, and error branches. **Complete.**
 - **T11 Frontend tests**: cover UI states, API outcomes, accessibility, and clipboard behavior. **Complete.**
 - **T12 Integration/E2E**: cover HTTP-to-SQLite behavior, restart persistence, concurrency, proxying, and smoke flow. **Complete.**
-- **T13 Security validation**: adversarial input, limits, CORS, host handling, redaction, and abuse-boundary tests.
-- **T14 Reliability/observability**: failure injection, health, request IDs, logs, retries, and shutdown validation.
+- **T13 Security validation**: adversarial input, limits, CORS, host handling, redaction, and abuse-boundary tests. **Complete.**
+- **T14 Reliability/observability**: failure injection, health, request IDs, logs, retries, and shutdown validation. **Complete.**
 - **T15 Code review**: independent requirements, architecture, security, scope, and test-evidence review. Human approval required.
 - **T16 Documentation**: setup, API, architecture, limitations, operations, and testing runbook.
 - **T17 Release readiness**: clean-checkout verification, dependency review, acceptance checklist, and go/no-go. Human approval required.
@@ -94,3 +94,41 @@ redirect caching, CORS, or configured-origin semantics. Human approval is
 required before those tasks treat the contract as final.
 Approval was recorded on 2026-08-31; T05, T08, and T09 may now implement
 against the contract.
+
+## T05–T09 implementation status
+
+- **T05 complete:** Spring Boot/Gradle, React/Vite, SQLite, Flyway, actuator
+  health, configuration overrides, and project tooling are established.
+- **T06 complete:** `V1__create_links.sql`, the `Link` model, JDBC repository,
+  SQLite constraints, and persistence tests are implemented.
+- **T07 complete:** HTTP/HTTPS URL policy, secure seven-character Base62 codes,
+  reserved route prefixes, and bounded collision retries are implemented and
+  unit tested.
+- **T08 complete:** create and redirect endpoints, configured-origin links,
+  request IDs, stable errors, JSON/body validation, CORS, and SQLite health are
+  implemented and tested. The request-size filter currently relies on the
+  declared `Content-Length` and remains a hardening item for chunked requests.
+- **T09 complete:** the React create-link workflow includes accessible input,
+  client-side usability validation, loading and failure states, result display,
+  and clipboard feedback. Frontend tests, lint, formatting, and production
+  build pass.
+
+## T13 handoff and validation status
+
+T13 is complete. `SecurityValidationIntegrationTest` covers hostile URL
+schemes, credentials, malformed hosts, control-character encodings, URL and
+request-body limits, configured-origin behavior despite Host and forwarded
+headers, no-fetch redirect behavior for a loopback destination, CORS allow and
+deny cases, and response redaction. Existing exception-handler tests cover SQL,
+stack-trace, collision, and secret redaction.
+
+Validation run:
+
+- `backend/gradlew.bat test --tests com.example.urlshortener.integration.SecurityValidationIntegrationTest` — passed.
+- `backend/gradlew.bat spotlessCheck` — passed.
+
+Residual issues are documented in the approved prototype boundary: anonymous
+creation has no rate limiting or abuse controls, and the request-size filter
+relies on declared `Content-Length` for early rejection. These remain blockers
+for public deployment and require a later approved task; T13 does not silently
+change that boundary.

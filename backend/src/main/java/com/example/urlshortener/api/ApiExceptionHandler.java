@@ -5,6 +5,8 @@ import com.example.urlshortener.domain.CodeNotFoundException;
 import com.example.urlshortener.domain.InvalidUrlException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +17,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ApiExceptionHandler.class);
+
     @ExceptionHandler(InvalidUrlException.class)
     ResponseEntity<ErrorResponse> invalidUrl(InvalidUrlException exception, HttpServletRequest request) {
         return error(HttpStatus.BAD_REQUEST, "INVALID_URL", exception.getMessage(), request);
@@ -44,12 +48,24 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(DataAccessException.class)
     ResponseEntity<ErrorResponse> storageFailure(DataAccessException exception, HttpServletRequest request) {
+        logFailure("storage_failure", exception, request);
         return error(HttpStatus.INTERNAL_SERVER_ERROR, "STORAGE_FAILURE", "Storage operation failed", request);
     }
 
     @ExceptionHandler(Exception.class)
     ResponseEntity<ErrorResponse> unexpectedFailure(Exception exception, HttpServletRequest request) {
+        logFailure("unexpected_failure", exception, request);
         return error(HttpStatus.INTERNAL_SERVER_ERROR, "STORAGE_FAILURE", "Request could not be completed", request);
+    }
+
+    private void logFailure(String event, Exception exception, HttpServletRequest request) {
+        LOGGER.error(
+                "event={} exception={} method={} path={} requestId={}",
+                event,
+                exception.getClass().getSimpleName(),
+                request.getMethod(),
+                request.getRequestURI(),
+                request.getAttribute(RequestIdFilter.REQUEST_ID_ATTRIBUTE));
     }
 
     static ResponseEntity<ErrorResponse> error(
