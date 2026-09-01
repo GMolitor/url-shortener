@@ -37,6 +37,17 @@ Use four-space indentation for Java and two spaces for TypeScript/JSON/YAML. Use
 
 Backend tests use JUnit/Spring Boot; frontend tests use Vitest. Name tests after observable behavior, such as `applicationStarts` or `submitsValidUrl`. Add unit tests for isolated logic and integration tests for HTTP, SQLite, migration, concurrency, security, and restart behavior. Every behavior change should include relevant tests.
 
+## Code Comments and Documentation
+
+Add concise comments or Javadocs to core classes and non-obvious methods when
+they explain behavior that is not apparent from the name or signature. Prioritize
+security boundaries, validation rationale, persistence/concurrency invariants,
+retry limits, externally visible HTTP behavior, and non-obvious algorithms.
+Comments should explain why the behavior exists and identify important
+constraints; do not restate the code line by line. Update comments when the
+behavior changes, remove comments that become inaccurate, and remember that
+comments do not replace tests or task/architecture documentation.
+
 ## Commits & Pull Requests
 
 No Git history is available in this greenfield workspace. Use imperative, focused commit subjects such as `Add link persistence migration` or `Test redirect lookup`. Pull requests should explain the change, link the task, identify tests run, document configuration changes, and include UI screenshots when frontend behavior changes.

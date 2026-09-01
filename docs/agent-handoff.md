@@ -17,6 +17,9 @@ Read these files before changing behavior:
 - Stop on a contradiction with an approved requirement or ADR.
 - Do not silently resolve a blocking ambiguity.
 - Add tests with behavior changes.
+- Add concise behavior comments/Javadocs for non-obvious core logic, especially
+  security, validation, persistence, concurrency, retries, and HTTP boundaries;
+  explain why and preserve comments as behavior evolves.
 - Run relevant tests, formatting, and linting before handoff.
 - Review the complete diff and report every changed file.
 - Never delete databases, user files, or unrelated work without explicit approval.
