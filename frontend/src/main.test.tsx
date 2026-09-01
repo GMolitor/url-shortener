@@ -49,12 +49,60 @@ describe('create-link workflow', () => {
 
   it('renders an accessible URL form', () => {
     expect(container.querySelector('h1')?.textContent).toBe('Shorten a URL');
+    const input =
+      container.querySelector<HTMLInputElement>('#destination-url')!;
     expect(
       container.querySelector('label[for="destination-url"]'),
     ).not.toBeNull();
+    expect(input.required).toBe(true);
+    expect(input.getAttribute('aria-describedby')).toBe('url-help');
+    expect(
+      container.querySelector('.status-area')?.getAttribute('aria-live'),
+    ).toBe('polite');
     expect(container.querySelector('button[type="submit"]')?.textContent).toBe(
       'Shorten URL',
     );
+  });
+
+  it('shows a loading state and disables the form while creating a link', async () => {
+    let resolveRequest!: (response: Response) => void;
+    const request = new Promise<Response>((resolve) => {
+      resolveRequest = resolve;
+    });
+    vi.spyOn(globalThis, 'fetch').mockReturnValue(request);
+    await setUrl('https://example.com');
+
+    act(() => {
+      container
+        .querySelector('form')!
+        .dispatchEvent(
+          new Event('submit', { bubbles: true, cancelable: true }),
+        );
+    });
+
+    expect(
+      container.querySelector<HTMLInputElement>('#destination-url')!.disabled,
+    ).toBe(true);
+    expect(
+      container.querySelector<HTMLButtonElement>('button[type="submit"]')!
+        .disabled,
+    ).toBe(true);
+    expect(
+      container.querySelector('button[type="submit"]')?.textContent,
+    ).toContain('Creating');
+
+    resolveRequest(
+      new Response(
+        JSON.stringify({ shortUrl: 'http://localhost:8080/Abc1234' }),
+        {
+          status: 201,
+        },
+      ),
+    );
+    await act(async () => request);
+    expect(
+      container.querySelector<HTMLInputElement>('#destination-url')!.disabled,
+    ).toBe(false);
   });
 
   it('rejects invalid URLs before calling the API', async () => {
@@ -81,7 +129,7 @@ describe('create-link workflow', () => {
         { status: 201, headers: { 'Content-Type': 'application/json' } },
       ),
     );
-    await setUrl('https://example.com/article');
+    await setUrl('  https://example.com/article  ');
 
     await submit();
 
@@ -110,6 +158,39 @@ describe('create-link workflow', () => {
     );
   });
 
+  it('uses a safe fallback for network and malformed API failures', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    fetchMock.mockRejectedValueOnce(new Error('Network unavailable'));
+    await setUrl('https://example.com');
+    await submit();
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe(
+      'Network unavailable',
+    );
+
+    fetchMock.mockResolvedValueOnce(new Response('not json', { status: 500 }));
+    await submit();
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe(
+      'The link could not be created. Try again.',
+    );
+  });
+
+  it('rejects credentials and control characters before calling the API', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    await setUrl('https://user:password@example.com');
+    await submit();
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      'embedded credentials',
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await setUrl('https://example.com/path\u0001next');
+    await submit();
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      'control characters',
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('copies the short link and confirms the action', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
@@ -136,5 +217,32 @@ describe('create-link workflow', () => {
 
     expect(writeText).toHaveBeenCalledWith('http://localhost:8080/Abc1234');
     expect(container.textContent).toContain('Copied to clipboard.');
+  });
+
+  it('shows a recoverable message when clipboard access fails', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({ shortUrl: 'http://localhost:8080/Abc1234' }),
+        {
+          status: 201,
+        },
+      ),
+    );
+    const writeText = vi.fn().mockRejectedValue(new Error('Clipboard blocked'));
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    await setUrl('https://example.com');
+    await submit();
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('.secondary-button')!.click();
+    });
+
+    expect(container.textContent).toContain(
+      'Could not copy the link. Select it manually.',
+    );
+    expect(container.querySelector('.message.error')).not.toBeNull();
   });
 });

@@ -11,6 +11,8 @@ import static org.mockito.Mockito.when;
 import com.example.urlshortener.domain.CodeCollisionException;
 import com.example.urlshortener.domain.CodeGenerationExhaustedException;
 import com.example.urlshortener.domain.CodeGenerator;
+import com.example.urlshortener.domain.CodeGenerationException;
+import com.example.urlshortener.domain.InvalidUrlException;
 import com.example.urlshortener.domain.Link;
 import com.example.urlshortener.repository.LinkRepository;
 import java.time.Clock;
@@ -19,6 +21,7 @@ import java.time.ZoneOffset;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,7 +39,7 @@ class LinkCreationServiceTest {
         LinkCreationService service = service();
 
         assertThatThrownBy(() -> service.create("ftp://example.com"))
-                .isInstanceOf(com.example.urlshortener.domain.InvalidUrlException.class);
+                .isInstanceOf(InvalidUrlException.class);
         verify(codeGenerator, never()).generate();
         verify(repository, never()).save(any());
     }
@@ -52,6 +55,43 @@ class LinkCreationServiceTest {
         assertThat(result).isEqualTo(created);
         verify(codeGenerator, times(2)).generate();
         verify(repository, times(2)).save(any());
+    }
+
+    @Test
+    void persistsGeneratedLinkWithCurrentUtcTimestamp() {
+        Link created = new Link(1L, "abc1234", "https://example.com", NOW);
+        when(codeGenerator.generate()).thenReturn("abc1234");
+        when(repository.save(any())).thenReturn(created);
+
+        Link result = service().create(created.destinationUrl());
+
+        ArgumentCaptor<Link> linkCaptor = ArgumentCaptor.forClass(Link.class);
+        verify(repository).save(linkCaptor.capture());
+        assertThat(result).isEqualTo(created);
+        assertThat(linkCaptor.getValue()).isEqualTo(new Link(null, "abc1234", created.destinationUrl(), NOW));
+    }
+
+    @Test
+    void propagatesGeneratorFailureWithoutPersisting() {
+        when(codeGenerator.generate()).thenThrow(new CodeGenerationException("generator failed"));
+
+        assertThatThrownBy(() -> service().create("https://example.com"))
+                .isInstanceOf(CodeGenerationException.class)
+                .hasMessage("generator failed");
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void propagatesNonCollisionStorageFailureWithoutRetrying() {
+        org.springframework.dao.DataAccessResourceFailureException failure =
+                new org.springframework.dao.DataAccessResourceFailureException("database unavailable");
+        when(codeGenerator.generate()).thenReturn("abc1234");
+        when(repository.save(any())).thenThrow(failure);
+
+        assertThatThrownBy(() -> service().create("https://example.com"))
+                .isSameAs(failure);
+        verify(codeGenerator).generate();
+        verify(repository).save(any());
     }
 
     @Test

@@ -26,14 +26,14 @@ T15,T16 -> T17 Release readiness
 - **T02 Architecture finalization**: incorporate adversarial findings and close Critical/High issues. **Approved.**
 - **T03 Data model**: define schema, indexes, constraints, timestamps, code capacity, and versioned migrations. **Complete.**
 - **T04 API definitions**: publish OpenAPI, payloads, error envelope, validation, redirect, and public-origin behavior. **Approved.**
-- **T05 Project foundation**: establish build, frontend, configuration, migration framework, health, tooling, and docs. This is `BOOTSTRAP-001`.
+- **T05 Project foundation**: establish build, frontend, configuration, migration framework, health, tooling, and docs.
 - **T06 Persistence**: implement link repository, mapping migration, SQLite behavior, and persistence tests.
 - **T07 Domain/code generation**: implement URL policy, secure codes, reserved paths, and bounded retries.
 - **T08 Backend API**: implement creation, redirect, health, validation, error handling, and configured-origin behavior.
 - **T09 React UI**: implement the approved create-link workflow and failure states.
-- **T10 Backend unit tests**: cover validation, generator, collision, and error branches.
-- **T11 Frontend tests**: cover UI states, API outcomes, accessibility, and clipboard behavior.
-- **T12 Integration/E2E**: cover HTTP-to-SQLite behavior, restart persistence, concurrency, proxying, and smoke flow.
+- **T10 Backend unit tests**: cover validation, generator, collision, and error branches. **Complete.**
+- **T11 Frontend tests**: cover UI states, API outcomes, accessibility, and clipboard behavior. **Complete.**
+- **T12 Integration/E2E**: cover HTTP-to-SQLite behavior, restart persistence, concurrency, proxying, and smoke flow. **Complete.**
 - **T13 Security validation**: adversarial input, limits, CORS, host handling, redaction, and abuse-boundary tests.
 - **T14 Reliability/observability**: failure injection, health, request IDs, logs, retries, and shutdown validation.
 - **T15 Code review**: independent requirements, architecture, security, scope, and test-evidence review. Human approval required.
