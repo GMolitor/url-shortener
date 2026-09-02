@@ -88,3 +88,20 @@ allocation retries remain bounded, and graceful shutdown is enabled with a
 ten-second shutdown phase. Failure handling, health, and shutdown behavior are
 covered by backend tests, including storage-failure injection and context-close
 validation.
+
+## T15 status
+
+The independent requirements, architecture, security, scope, and test-evidence
+review is approved by the human approver on 2026-09-01. No additional defects
+were found in the local prototype. Brownfield follow-up remains for enforcing
+the request-body limit on chunked requests and maintaining documentation
+consistency; both are accepted as non-urgent prototype limitations and remain
+public-deployment blockers where applicable.
+
+## T16 status
+
+T16 is complete. The documentation set includes the current README, API
+contract, architecture, data model, requirements, and the detailed
+[`runbook.md`](runbook.md) for setup, operations, API usage, testing,
+troubleshooting, and prototype limitations. T17 should perform final clean
+checkout and command verification.

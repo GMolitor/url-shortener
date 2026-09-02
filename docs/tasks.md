@@ -36,8 +36,8 @@ T15,T16 -> T17 Release readiness
 - **T12 Integration/E2E**: cover HTTP-to-SQLite behavior, restart persistence, concurrency, proxying, and smoke flow. **Complete.**
 - **T13 Security validation**: adversarial input, limits, CORS, host handling, redaction, and abuse-boundary tests. **Complete.**
 - **T14 Reliability/observability**: failure injection, health, request IDs, logs, retries, and shutdown validation. **Complete.**
-- **T15 Code review**: independent requirements, architecture, security, scope, and test-evidence review. Human approval required.
-- **T16 Documentation**: setup, API, architecture, limitations, operations, and testing runbook.
+- **T15 Code review**: independent requirements, architecture, security, scope, and test-evidence review. **Approved.**
+- **T16 Documentation**: setup, API, architecture, limitations, operations, and testing runbook. **Complete.**
 - **T17 Release readiness**: clean-checkout verification, dependency review, acceptance checklist, and go/no-go. Human approval required.
 
 ## Parallel groups
@@ -132,3 +132,23 @@ creation has no rate limiting or abuse controls, and the request-size filter
 relies on declared `Content-Length` for early rejection. These remain blockers
 for public deployment and require a later approved task; T13 does not silently
 change that boundary.
+
+## T15 review and approval
+
+The independent T15 review found no additional implementation defects in the
+local prototype. Human approval was granted on 2026-09-01. The following items
+are accepted as brownfield follow-up work and remain blockers for public
+deployment:
+
+- enforce the request-body limit for chunked requests rather than relying on
+  declared `Content-Length`;
+- keep the prototype README and operational documentation aligned as the
+  frontend and deployment model evolve.
+
+## T16 handoff
+
+The documentation set is current through the implemented prototype. The
+README covers orientation and quick setup; `docs/runbook.md` is the detailed
+setup, API, operations, troubleshooting, limitations, and testing guide. T17
+should verify the commands and clean-checkout instructions during release
+readiness.

@@ -1,6 +1,13 @@
 # URL Shortener
 
-Greenfield foundation for the URL shortener modular monolith.
+Greenfield local-first URL-shortener prototype implemented as a Spring Boot
+backend and React/Vite frontend. The backend accepts validated HTTP/HTTPS
+destinations, stores generated short codes in SQLite, and redirects visitors
+from known codes. The API is independently usable from the frontend.
+
+This is the initial prototype milestone. The eventual product goal is
+production readiness, but this deployment is intentionally restricted to local
+or trusted-demo use on one backend instance.
 
 ## Engineering documentation
 
@@ -8,9 +15,26 @@ Greenfield foundation for the URL shortener modular monolith.
 - [Architecture and ADRs](docs/architecture.md)
 - [Data model](docs/data-model.md)
 - [OpenAPI contract](docs/openapi.yaml)
+- [Operations and testing runbook](docs/runbook.md)
 - [Adversarial architecture review](docs/adversarial-review.md)
 - [Task plan and dependency graph](docs/tasks.md)
 - [Agent handoff guide](docs/agent-handoff.md)
+
+## Current capabilities
+
+- `POST /api/links` validates and persists a destination, then returns a
+  seven-character case-sensitive Base62 code and configured short URL.
+- `GET /{code}` returns an HTTP 302 redirect for a known code and a controlled
+  JSON 404 response for an unknown code.
+- `GET /actuator/health` reports application and SQLite health.
+- URL validation rejects unsupported schemes, malformed URLs, credentials,
+  control characters, invalid ports, and URLs longer than 2,048 characters.
+- SQLite persistence uses the Flyway `V1__create_links.sql` migration.
+- Backend tests cover API behavior, URL policy, code generation, persistence,
+  migrations, restart behavior, and collision handling.
+
+The frontend provides the complete React/Vite create-link workflow governed by
+the approved requirements and OpenAPI contract.
 
 ## Prerequisites
 
@@ -19,51 +43,48 @@ Greenfield foundation for the URL shortener modular monolith.
 
 ## Run locally
 
-From `backend`, start Spring Boot:
+Start the backend from `backend`:
 
 ```powershell
-.\\gradlew.bat bootRun
+.\gradlew.bat bootRun
 ```
 
-From `frontend`, install dependencies and start Vite:
+Start the frontend from `frontend`:
 
 ```powershell
 npm ci
 npm run dev
 ```
 
-The backend listens on `http://localhost:8080` and the frontend on
-`http://localhost:5173`.
+By default, the backend listens on `http://localhost:8080` and the frontend
+on `http://localhost:5173`.
 
 ## Configuration
 
-- `SERVER_PORT`: backend port, default `8080`
-- `DATABASE_PATH`: SQLite file path, default `./data/url-shortener.sqlite`
-- `PUBLIC_ORIGIN`: configured public URL origin, default `http://localhost:8080`
+- `SERVER_PORT`: backend port; default `8080`
+- `DATABASE_PATH`: SQLite file path; default `./data/url-shortener.sqlite`
+- `PUBLIC_ORIGIN`: origin used to construct returned short URLs; default
+  `http://localhost:8080`
+- `FRONTEND_ORIGIN`: sole allowed frontend CORS origin; default
+  `http://localhost:5173`
 
-Flyway migration infrastructure is configured and runs automatically at backend
-startup. T06 will add the first business migration, `V1__create_links.sql`,
-defined by the approved data-model contract.
+The backend binds to `127.0.0.1` by default. Flyway validates and runs
+migrations at startup. Do not edit an already-applied migration or disable
+validation. If a local database has a migration checksum mismatch, stop the
+backend, back up and remove that local database, then restart it.
 
-If startup reports `Migration checksum mismatch`, the local SQLite file was
-created from a different migration revision. Stop the backend, back up and
-remove the configured database file, then restart so Flyway can recreate the
-local schema. Do not edit an already-applied migration or disable validation.
+## Validate changes
 
-## Validation
-
-Backend:
+Backend, from `backend`:
 
 ```powershell
-cd backend
-.\\gradlew.bat test
-.\\gradlew.bat spotlessCheck
+.\gradlew.bat test
+.\gradlew.bat spotlessCheck
 ```
 
-Frontend:
+Frontend, from `frontend`:
 
 ```powershell
-cd frontend
 npm ci
 npm test
 npm run lint
@@ -77,5 +98,11 @@ Health check:
 GET http://localhost:8080/actuator/health
 ```
 
-This foundation contains no URL creation, short-code generation, redirects,
-analytics, authentication, rate limiting, or business-specific database tables.
+## Prototype boundary and production readiness
+
+The prototype is limited to one local/trusted-demo instance, 10 concurrent
+clients, 100 link creations per minute, and 1,000 persisted links. It must not
+be exposed directly to the public internet. Anonymous rate limiting, quotas,
+abuse and moderation controls, link lifecycle management, backups, operational
+alerting, multi-instance database support, and production capacity targets are
+required before a public production deployment.
