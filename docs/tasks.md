@@ -38,7 +38,7 @@ T15,T16 -> T17 Release readiness
 - **T14 Reliability/observability**: failure injection, health, request IDs, logs, retries, and shutdown validation. **Complete.**
 - **T15 Code review**: independent requirements, architecture, security, scope, and test-evidence review. **Approved.**
 - **T16 Documentation**: setup, API, architecture, limitations, operations, and testing runbook. **Complete.**
-- **T17 Release readiness**: clean-checkout verification, dependency review, acceptance checklist, and go/no-go. Human approval required.
+- **T17 Release readiness**: clean-checkout verification, dependency review, acceptance checklist, and go/no-go. **Complete and approved 2026-09-03.**
 
 ## Parallel groups
 
@@ -150,5 +150,25 @@ deployment:
 The documentation set is current through the implemented prototype. The
 README covers orientation and quick setup; `docs/runbook.md` is the detailed
 setup, API, operations, troubleshooting, limitations, and testing guide. T17
-should verify the commands and clean-checkout instructions during release
+verified the commands and clean-checkout instructions during release
 readiness.
+
+## T17 handoff and approval
+
+T17 is complete. The human reviewer approved the prototype result after the
+clean-checkout verification, dependency review, acceptance checklist, and
+go/no-go review. The approved release boundary is local/trusted-demo use on
+one backend instance; this prototype is not intended
+to be hosted publicly.
+
+## Brownfield prototype-quality handoff
+
+The brownfield audit, findings, architectural refactoring guidance, and
+agent-ready follow-up tasks A01–A07 are documented in
+[`brownfield-readiness-plan.md`](brownfield-readiness-plan.md).
+
+The prototype handoff is approved. A01–A07 are targeted correctness,
+security, testability, reproducibility, and documentation improvements; they
+do not authorize adding a permanent database, hosted deployment, public rate
+limiting, moderation, lifecycle management, or disaster-recovery infrastructure.
+Those remain documented future-product concerns.

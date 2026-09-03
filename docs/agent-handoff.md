@@ -9,6 +9,8 @@ Read these files before changing behavior:
 3. [`adversarial-review.md`](adversarial-review.md)
 4. [`tasks.md`](tasks.md)
 5. The root [`README.md`](../README.md) for runnable commands
+6. The [`brownfield-readiness-plan.md`](brownfield-readiness-plan.md) for
+   prototype-quality follow-up tasks and deferred public-service concerns
 
 ## Working rules
 
@@ -103,5 +105,13 @@ public-deployment blockers where applicable.
 T16 is complete. The documentation set includes the current README, API
 contract, architecture, data model, requirements, and the detailed
 [`runbook.md`](runbook.md) for setup, operations, API usage, testing,
-troubleshooting, and prototype limitations. T17 should perform final clean
+troubleshooting, and prototype limitations. T17 completed the final clean
 checkout and command verification.
+
+## Brownfield prototype-quality status
+
+The prototype’s local release is approved. The audit, architectural
+refactoring guidance, and independently assignable A01–A07 quality tasks are in
+[`brownfield-readiness-plan.md`](brownfield-readiness-plan.md). T17 is complete;
+do not add hosted production infrastructure or infer public-service scope from
+the prototype’s use of the phrase production quality.

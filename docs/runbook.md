@@ -1,6 +1,6 @@
 # Operations and Testing Runbook
 
-This runbook describes the current local/trusted-demo prototype. It is the
+This runbook describes the local/trusted-demo production-ready prototype. It is the
 operational companion to the [requirements](requirements.md),
 [architecture](architecture.md), and [OpenAPI contract](openapi.yaml).
 
@@ -118,8 +118,8 @@ For a checksum mismatch or intentionally disposable local database:
 For a useful local backup, stop the backend first so no write is in progress,
 then copy the configured SQLite file. Restore only while the backend is
 stopped. Production backup, integrity checking, retention, and corruption
-recovery procedures are not yet implemented and must be designed before
-public deployment.
+recovery are not prototype requirements; they would be designed separately
+before any public deployment.
 
 ## Shutdown and failure handling
 
@@ -130,7 +130,8 @@ datasource error, correct configuration or file permissions, and restart.
 The prototype is single-instance. Do not point multiple backend processes at
 the same SQLite file or expose the service to untrusted public traffic.
 Anonymous creation has no rate limiting, quota, moderation, or link lifecycle
-controls. These are release blockers for production use.
+controls. These are limitations of the local prototype and would be release
+blockers only for a future public service.
 
 ## Testing and quality checks
 

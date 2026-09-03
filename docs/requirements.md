@@ -21,34 +21,33 @@ Provide a local-first URL-shortening service that accepts a valid destination UR
 - Persistence: SQLite with Spring JDBC.
 - Local setup requires no external services.
 - Configuration supports server port, database path, and public origin overrides.
-- The service is single-instance and prototype/local-only until production controls are added.
+- The service is a production-quality, single-instance local prototype. Public hosting and multi-instance operation are out of scope.
 
-## Capacity and deployment boundary
+## Capacity and prototype boundary
 
-The initial implementation is a greenfield scenario prototype. Its baseline
+The implementation is a local-first production-ready prototype. Its baseline
 targets are intentionally limited to local development and trusted demo use on
-one application instance. The eventual product goal is production readiness,
-but production readiness is a later milestone with additional approved work;
-it is not implied by satisfying the prototype acceptance criteria below.
+one application instance. The prototype expects production-quality correctness,
+security, maintainability, testing, and reproducible setup within this local
+boundary. It does not require public hosting or production infrastructure.
 
 The prototype boundary is:
 
 - At most 10 concurrent clients and 100 link-creation requests per minute.
-- At most 1,000 persisted links in the prototype database.
+- At most 1,000 persisted links in the local prototype database.
 - For a warm local instance, creation should target p95 latency below 500 ms
   and redirects below 250 ms, excluding client/network startup overhead.
 - The default deployment is bound to the local machine. It must not be exposed
   directly to the public internet or treated as a multi-instance service.
 - The seven-character case-sensitive Base62 space contains 62^7 =
   3,521,614,606,208 possible codes. The 1,000-link target is a prototype
-  operating bound, not a guarantee of production-scale collision behavior.
+  operating bound, not a guarantee of public-service collision behavior.
 
 Exceeding these limits, serving untrusted public traffic, or running multiple
-backend instances requires a new approved capacity and deployment design as
-part of the production-readiness plan. That design must address rate limiting
-and quotas, abuse/moderation controls, link lifecycle management, durable
-backups, operational monitoring, and a multi-instance-capable database/control
-plane.
+backend instances requires a new approved capacity and deployment design. That
+future design would need rate limiting and quotas, abuse/moderation controls,
+link lifecycle management, durable backups, operational monitoring, and a
+multi-instance-capable database/control plane.
 
 ## API requirements
 
@@ -78,7 +77,8 @@ limits, redirect headers, and configured-origin behavior.
 - Use an explicitly configured public origin; do not trust arbitrary host headers.
 - Restrict CORS to the configured local frontend origin.
 - Do not expose stack traces, SQL details, secrets, or full destination URLs in logs.
-- Anonymous creation requires rate limiting before any public deployment.
+- Anonymous creation requires rate limiting before any public deployment; the
+  prototype is not a public deployment.
 
 ## Reliability and observability
 
@@ -90,7 +90,7 @@ limits, redirect headers, and configured-origin behavior.
 
 ## Explicit assumptions
 
-- Anonymous, single-instance prototype.
+- Anonymous, single-instance local prototype.
 - Generated codes only; each valid create request creates a new mapping.
 - HTTP 302 redirects with conservative caching behavior.
 - Maximum URL length is 2048 characters.
@@ -99,8 +99,8 @@ limits, redirect headers, and configured-origin behavior.
 - The capacity and latency targets above are planning targets for validation,
   not a production service-level objective.
 - Public deployment is out of scope for the prototype; anonymous rate limiting
-  is therefore deferred in code but remains a release-blocking prerequisite
-  for the eventual production-ready service.
+  is therefore deferred in code and remains a prerequisite only for a future
+  public service.
 
 ## Ambiguities and disposition
 
@@ -112,7 +112,7 @@ limits, redirect headers, and configured-origin behavior.
 | Duplicate destination handling | ASSUMPTION | Always create a new mapping |
 | Code format | ASSUMPTION | Seven-character case-sensitive Base62 |
 | Redirect code | ASSUMPTION | HTTP 302 |
-| Rate limiting | BLOCKING for public deployment; DEFERRED for local MVP | Document local-only restriction; require controls before public use |
+| Rate limiting | DEFERRED for this local prototype; required for public deployment | Document local-only restriction; require controls before public use |
 | Analytics | DEFERRED | No click/event data in MVP |
 | Deployment scale | ASSUMPTION | Local single instance |
 
@@ -127,5 +127,5 @@ limits, redirect headers, and configured-origin behavior.
 - Health checks report application and SQLite status.
 - Tests, formatting, linting, and frontend build pass.
 - No secrets, databases, build output, or business functionality are committed accidentally.
-- The documented capacity targets and deployment boundary are reviewed and
-  explicitly approved before T02 begins.
+- The documented capacity and prototype boundary are reviewed and explicitly
+  approved before final prototype handoff. T17 is complete and approved.

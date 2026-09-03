@@ -13,12 +13,10 @@ Browser -> React UI -> Spring Boot API -> SQLite
 
 The API is independently usable. No external service is required for local operation.
 
-This architecture supports the initial greenfield scenario prototype and
-preserves a path to the eventual production-ready service. The prototype is
-local/trusted-demo only, single-instance, and bounded by the capacity targets
-in `requirements.md`. Production readiness is a later milestone and requires
-explicitly approved changes to deployment, abuse prevention, operations, and
-data durability.
+This architecture supports a production-ready local prototype. It
+is local/trusted-demo only, single-instance, and bounded by the capacity targets
+in `requirements.md`. Public hosting, multi-instance operation, and production
+operations are intentionally outside the prototype boundary.
 
 ## Components
 
@@ -78,8 +76,8 @@ fail clearly when migrations cannot be applied or validated. Repository code is
 the only layer allowed to issue SQL, and the database uniqueness constraint is
 the authority for code collisions. Writes must be durable before a successful
 create response. SQLite is operated as one database owned by one backend
-instance; backup, restore, integrity checking, and corruption recovery are
-production-readiness requirements.
+instance. Backup, restore, integrity checking, and corruption recovery are
+future public-service requirements, not prototype requirements.
 
 ### Concurrency, retries, and observability
 
@@ -90,14 +88,14 @@ structured access/failure logs, timing, and database/migration health are
 cross-cutting responsibilities, with controlled responses for database
 failures.
 
-### Production-readiness gate
+### Public-deployment gate
 
-The prototype must not be exposed to public or untrusted traffic. Before that
-boundary changes, the design must add rate limiting and quotas, abuse and
-moderation controls, link disable/removal or expiration, backup procedures,
-operational alerting, a multi-instance-capable database/control plane, and
-validated capacity/SLO targets. These are follow-up design and implementation
-work, not implicit features of the prototype.
+The prototype must not be exposed to public or untrusted traffic. If a future
+project changes that boundary, the design must add rate limiting and quotas,
+abuse and moderation controls, link disable/removal or expiration, backup
+procedures, operational alerting, a multi-instance-capable database/control
+plane, and validated capacity/SLO targets. These are future-product work, not
+implicit features of this prototype.
 
 ## Architectural decisions
 
@@ -139,12 +137,21 @@ Flyway migrations are the single schema-evolution mechanism. Ad hoc startup DDL,
 ORM-generated schema changes, and repository-side table creation are rejected
 because they make clean installs, upgrades, and rollback analysis ambiguous.
 
-### ADR-010: Prototype-to-production boundary
+### ADR-010: Prototype-to-public-service boundary
 
-The greenfield prototype optimizes for a small, inspectable local system. Its
-interfaces and repository boundary should remain production-evolvable, but no
-production capability is assumed until it is explicitly designed, tested, and
-approved in a later task.
+The prototype optimizes for a small, inspectable local system. Its interfaces
+and repository boundary should remain production-evolvable, but hosted
+production capability is not assumed or required. Any future public service
+must be separately designed, tested, and approved.
+
+### ADR-011: Local prototype deployment
+
+The local evaluation environment runs one Spring Boot process, one SQLite file, and one
+separately served React/Vite frontend. PostgreSQL, containers, cloud resources,
+distributed controls, and permanent hosting are rejected for this prototype
+because they add deployment complexity without improving the evaluated local
+behavior. The code should remain easy to replace or extend later through its
+repository and module boundaries.
 
 ## Correctness, reliability, and optional optimizations
 
@@ -165,4 +172,5 @@ CORS restrictions, and request/log redaction.
 - SQLite does not support high write concurrency or multiple application instances.
 - There is no link deletion, disabling, expiration, ownership, or analytics.
 - Destination safety is syntactic only.
-- Advanced production operations are not included.
+- Hosted production operations are not included; local correctness and
+  diagnostics are included.

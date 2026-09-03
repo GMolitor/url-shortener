@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: URL Shortener API
   version: 1.0.0
-  description: Local/trusted-demo API contract for the greenfield URL shortener prototype.
+  description: Local/trusted-demo API contract for the production-ready URL shortener prototype.
 servers:
   - url: http://localhost:8080
     description: Default local server; generated URLs use PUBLIC_ORIGIN.

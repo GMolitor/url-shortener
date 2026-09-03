@@ -1,13 +1,13 @@
 # URL Shortener
 
-Greenfield local-first URL-shortener prototype implemented as a Spring Boot
+Local-first, production-ready URL-shortener prototype implemented as a Spring Boot
 backend and React/Vite frontend. The backend accepts validated HTTP/HTTPS
 destinations, stores generated short codes in SQLite, and redirects visitors
 from known codes. The API is independently usable from the frontend.
 
-This is the initial prototype milestone. The eventual product goal is
-production readiness, but this deployment is intentionally restricted to local
-or trusted-demo use on one backend instance.
+This is a production-ready prototype. It is intentionally
+restricted to local or trusted-demo use on one backend instance; it is not
+intended to be hosted or exposed as a public service.
 
 ## Engineering documentation
 
@@ -18,6 +18,7 @@ or trusted-demo use on one backend instance.
 - [Operations and testing runbook](docs/runbook.md)
 - [Adversarial architecture review](docs/adversarial-review.md)
 - [Task plan and dependency graph](docs/tasks.md)
+- [Brownfield production-readiness plan](docs/brownfield-readiness-plan.md)
 - [Agent handoff guide](docs/agent-handoff.md)
 
 ## Current capabilities
@@ -98,11 +99,13 @@ Health check:
 GET http://localhost:8080/actuator/health
 ```
 
-## Prototype boundary and production readiness
+## Prototype boundary and future public-service work
 
 The prototype is limited to one local/trusted-demo instance, 10 concurrent
 clients, 100 link creations per minute, and 1,000 persisted links. It must not
 be exposed directly to the public internet. Anonymous rate limiting, quotas,
 abuse and moderation controls, link lifecycle management, backups, operational
-alerting, multi-instance database support, and production capacity targets are
-required before a public production deployment.
+alerting, multi-instance database support, and public capacity targets are
+future-service requirements, not requirements for this local prototype.
+Production quality here means correct local behavior, security at the stated
+boundary, maintainable code, reproducible setup, and thorough validation.

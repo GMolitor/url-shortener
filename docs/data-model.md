@@ -77,7 +77,7 @@ not a pre-check query, decides whether a code is available.
 - Migration application is expected to be transactional where SQLite/Flyway
   support permits; a failed startup must not advertise a healthy database.
 - Schema changes must remain compatible with the one-instance SQLite boundary
-  until a separately approved production database design replaces it.
+  until a separately approved public-service database design replaces it.
 
 ## Out of scope
 
