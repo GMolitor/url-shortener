@@ -118,11 +118,12 @@ describe('create-link workflow', () => {
   });
 
   it('submits a valid URL and displays the returned short link', async () => {
+    const shortUrl = 'http://localhost:8080/Abc1234';
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
         JSON.stringify({
           code: 'Abc1234',
-          shortUrl: 'http://localhost:8080/Abc1234',
+          shortUrl,
           destinationUrl: 'https://example.com/article',
           createdAt: '2026-09-01T19:30:00Z',
         }),
@@ -138,10 +139,39 @@ describe('create-link workflow', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: 'https://example.com/article' }),
     });
-    expect(container.querySelector('.result a')?.textContent).toBe(
-      'http://localhost:8080/Abc1234',
+    expect(container.querySelector('.result a')?.textContent).toBe(shortUrl);
+    expect(container.querySelector<HTMLAnchorElement>('.result a')?.href).toBe(
+      shortUrl,
     );
+    expect(() => new URL(shortUrl)).not.toThrow();
   });
+
+  it.each([
+    [
+      413,
+      'REQUEST_TOO_LARGE',
+      'The request is too large. Shorten the destination URL and try again.',
+    ],
+    [
+      503,
+      'SERVICE_UNAVAILABLE',
+      'The link service is temporarily unavailable. Try again shortly.',
+    ],
+  ])(
+    'shows a recoverable message for HTTP %s server errors',
+    async (status, errorCode, message) => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ errorCode }), { status }),
+      );
+      await setUrl('https://example.com');
+
+      await submit();
+
+      expect(container.querySelector('[role="alert"]')?.textContent).toBe(
+        message,
+      );
+    },
+  );
 
   it('displays a server error message', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(

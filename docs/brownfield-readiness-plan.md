@@ -18,6 +18,28 @@ Audit/scope update: 2026-09-03
 T17 status: **Complete and approved by the human reviewer.**  
 Code changes made by this planning update: none.
 
+## Final brownfield review status — 2026-09-03
+
+The final review verified the current working-tree implementation and tests
+against the approved T01–T17 contracts without reopening or repeating those
+tasks. The verdict is **GO for the local/trusted-demo prototype**. This is not
+a public-service approval.
+
+| Area | Status | Evidence and disposition |
+|---|---|---|
+| A01 request-body limit | **Complete** | Fixed-length, exact-limit, chunked-over-limit, and read-failure tests; full backend suite passed. The filter retains at most 4,097 bytes. |
+| A02 atomic persistence | **Complete** | SQLite `INSERT ... RETURNING id` inside a transaction; collision and simulated generated-key failure rollback tests passed. |
+| A03 API/config boundaries | **Complete** | Origin startup validation, configured-origin/Host handling, CORS, unsupported method/path/media, and stable-envelope tests passed. |
+| A04 redirect/destination security | **Complete** | Existing security validation covers hostile URL inputs, encoded controls, no-fetch loopback redirect, origin manipulation, redaction, case-sensitive codes, and `no-store`; documentation now states private/loopback acceptance is intentional. |
+| A05 frontend/local integration | **Complete** | `npm ci`, 11 Vitest tests, lint, format, and build passed; Vite remains a local proxy with separate processes. |
+| A06 reproducibility/quality | **Partial** | Backend/frontend documented checks passed; 10-client concurrency and 1,000-link persistence passed. The focused 1,000-link invocation took 21.885 seconds (2.785 seconds test time). A hosted CI job, clean checkout of the uncommitted state, and a separate dependency-review step were not run/present. |
+| A07 documentation/handoff | **Partial** | Requirements, architecture, OpenAPI, runbook, tasks, handoff, and this plan were synchronized and evidence was recorded. A07 is not claimed complete because clean-checkout/CI evidence and the A06 dependency-review decision remain open. |
+
+The final review's early-rejection logging finding is resolved: `AccessLogFilter`
+now wraps `RequestIdFilter`, so body-limit/read-failure responses are
+access-logged with the same safe fields as normal requests, without duplicate
+events for requests that continue through the chain.
+
 ### Release verdicts
 
 - **Prototype handoff:** **GO** for the approved local/trusted-demo boundary.
@@ -78,18 +100,18 @@ they are not public-service capacity or disaster-recovery evidence.
 
 | ID | Finding | Prototype disposition | Evidence / follow-up |
 |---|---|---|---|
-| F-01 | The 4,096-byte request guard relies on declared 'Content-Length'; chunked input can bypass the early filter. | **Required hardening** because it is a concrete resource-control gap even locally. | 'RequestIdFilter.java'; A01 |
-| F-02 | Repository 'save' inserts and then performs a separate lookup for the ID. A read failure after insertion could report failure after data was written. | **Required reliability review/refactor**; preserve SQLite and the repository boundary. | 'JdbcLinkRepository.java'; A02 |
-| F-03 | 'PUBLIC_ORIGIN' and 'FRONTEND_ORIGIN' have no explicit startup validation contract. | **Recommended hardening** for predictable evaluator configuration and safe origin handling. | 'application.yml', 'WebConfiguration.java', 'LinkController.java'; A03 |
-| F-04 | Framework-generated failures such as method mismatches and unmapped API paths are not fully specified by the stable error contract. | **Recommended contract hardening** where it can be done without broad framework complexity. | 'ApiExceptionHandler.java', 'openapi.yaml'; A03 |
+| F-01 | The 4,096-byte request guard relied on declared 'Content-Length'; chunked input could bypass the early filter. | **Completed by A01.** | 'RequestIdFilter.java' and request-boundary tests |
+| F-02 | Repository 'save' inserted and then performed a separate lookup for the ID. | **Completed by A02.** | 'JdbcLinkRepository.java' and rollback test |
+| F-03 | 'PUBLIC_ORIGIN' and 'FRONTEND_ORIGIN' had no explicit startup validation contract. | **Completed by A03.** | 'OriginValidator.java', startup tests, and synchronized docs |
+| F-04 | Framework-generated failures such as method mismatches and unmapped API paths were not fully specified by the stable error contract. | **Completed by A03 for the in-scope routes.** | 'ApiExceptionHandler.java', controller tests, and 'openapi.yaml' |
 | F-05 | Destination validation is syntactic and permits loopback/private destinations; no reputation screening exists. | **Accepted prototype boundary.** Keep the no-fetch guarantee and document that public abuse screening is excluded. | 'UrlPolicy.java', architecture ADR-008; A04 documentation/tests |
 | F-06 | Anonymous creation has no rate limiting or quotas. | **Public-only deferred work; not required for local evaluation.** | Requirements/runbook limitation; deferred public-service work |
 | F-07 | No link disable/delete/expiration/ownership/takedown workflow exists. | **Public/product-only deferred work; do not add speculative features.** | 'Link.java', 'V1__create_links.sql'; deferred public-service work |
 | F-08 | SQLite is single-instance and unsuitable for hosted multi-instance scale. | **Accepted prototype boundary.** Keep SQLite and test migration/restart behavior. | Architecture ADR-006; A06 |
 | F-09 | No production backup schedule, retention, restore drill, RPO/RTO, or corruption response exists. | **Out of scope.** Local database backup/reset instructions are sufficient. | 'runbook.md'; deferred public-service work |
-| F-10 | Request IDs, access logs, and health exist; production metrics, alerting, and log shipping do not. | **Current local baseline accepted.** Add only low-complexity diagnostic improvements justified by tests/rubric. | 'AccessLogFilter.java', 'application.yml'; A06 |
+| F-10 | Request IDs, access logs, and health exist; production metrics, alerting, and log shipping do not. | **Local baseline accepted; the early-rejection logging gap is resolved by the final review follow-up.** | 'AccessLogFilter.java', 'RequestIdFilter.java', 'application.yml'; A06 |
 | F-11 | No production packaging, TLS/proxy deployment, secret manager, or hosted actuator policy exists. | **Out of scope.** Require reproducible local commands and safe defaults instead. | CI/application config; A06 |
-| F-12 | Dependencies are pinned/locked, but CI has no extensive vulnerability/license/provenance pipeline. | **Recommended prototype hygiene**, limited to checks that run reliably in the repository’s CI. | 'build.gradle', 'package-lock.json', '.github/workflows/ci.yml'; A06 |
+| F-12 | Dependencies are pinned/locked, but CI has no extensive vulnerability/license/provenance pipeline. | **Partial A06 hygiene.** Inputs are reproducible enough for local checks, but no separate lightweight dependency-review step exists. | 'build.gradle', 'package-lock.json', '.github/workflows/ci.yml'; A06 |
 | F-13 | The production build/topology for separately run frontend and backend is not a hosted deployment specification. | **Accepted prototype boundary.** Verify the local Vite proxy and build instructions. | 'vite.config.ts', 'README.md', 'runbook.md'; A05/A06 |
 | F-14 | Existing concurrency tests are correctness checks at the prototype boundary, not public load tests. | **Right-sized validation required:** verify the stated local bounds and avoid infrastructure-heavy load tooling. | 'HttpSqliteIntegrationTest.java', requirements; A06 |
 

@@ -45,6 +45,9 @@ needed:
 
 `PUBLIC_ORIGIN` is configuration, not derived from `Host` or forwarded headers.
 Keep it aligned with the address users should receive in API responses.
+Both origin settings are validated at startup and must be absolute HTTP(S)
+origins without credentials, paths, queries, fragments, or wildcards. An
+invalid value fails startup with the setting name in the diagnostic.
 
 ## API quick reference
 
@@ -77,10 +80,17 @@ Expected API behavior:
 - Invalid JSON, fields, URLs, or code paths: `400` with the appropriate stable
   error code.
 - Non-JSON create requests: `415` with `UNSUPPORTED_MEDIA_TYPE`.
-- Requests over 4,096 bytes: `413` with `REQUEST_TOO_LARGE` when the declared
-  `Content-Length` exceeds the limit.
+- Requests over 4,096 bytes: `413` with `REQUEST_TOO_LARGE`, regardless of
+  whether the request uses a declared length or chunked transfer encoding.
 - Persistence failures: `500` with `STORAGE_FAILURE`.
 - Code-allocation exhaustion: `503` with `SERVICE_UNAVAILABLE`.
+
+Destination URLs are validated syntactically and stored as supplied; the
+backend never resolves, fetches, previews, or proxies them. Loopback and
+private-network destinations are intentionally accepted within this
+local/trusted-demo boundary. They must not be treated as safe for a future
+public deployment without a separately approved abuse and destination-safety
+design.
 
 Error responses contain `status`, `errorCode`, `message`, `requestId`, and
 UTC `timestamp`. Messages and logs do not expose stack traces, SQL details,
@@ -96,7 +106,7 @@ Invoke-RestMethod http://localhost:8080/actuator/health
 
 Healthy startup returns HTTP `200` with status `UP`; an unavailable database or
 application component returns HTTP `503` with status `DOWN`. Every request
-receives an `X-Request-Id` response header. Access logs include the event,
+receives an `X-Request-Id` response header and an access log with the event,
 method, path, status, duration, and request ID. Storage and unexpected failures
 log the exception type and correlation fields without sensitive exception
 messages.
@@ -172,8 +182,8 @@ Before handing off a change:
 
 - Prototype capacity is 10 concurrent clients, 100 creates per minute, and
   1,000 persisted links.
-- Request-size rejection currently relies on declared `Content-Length`; a
-  chunked request can bypass the early filter and remains a hardening item.
+- Request-size rejection reads at most one byte beyond the 4,096-byte limit,
+  so chunked requests cannot bypass the body cap.
 - Anonymous creation is abuse-prone because rate limiting and quotas are not
   implemented.
 - SQLite is not suitable for high write concurrency or multiple instances.

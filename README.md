@@ -69,6 +69,9 @@ on `http://localhost:5173`.
 - `FRONTEND_ORIGIN`: sole allowed frontend CORS origin; default
   `http://localhost:5173`
 
+Both origins must be absolute HTTP(S) origins without credentials, paths,
+queries, fragments, or wildcards; invalid values fail backend startup.
+
 The backend binds to `127.0.0.1` by default. Flyway validates and runs
 migrations at startup. Do not edit an already-applied migration or disable
 validation. If a local database has a migration checksum mismatch, stop the

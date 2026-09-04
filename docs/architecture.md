@@ -63,8 +63,10 @@ Analytics is not part of the MVP. If later introduced, redirect handling must em
 
 The API validates HTTP/HTTPS schemes, malformed URLs, embedded credentials,
 control characters, URL length, request-body size, and JSON content type at the
-boundary. URL policy is shared with the domain layer so UI validation is only a
-usability aid and never the security authority. A centralized error mapper
+boundary. The request-body guard reads at most one byte beyond the 4,096-byte
+limit, including for chunked transfer encoding. URL policy is shared with the
+domain layer so UI validation is only a usability aid and never the security
+authority. A centralized error mapper
 returns the T04 error envelope with a request ID and UTC timestamp while
 redacting destination URLs, SQL details, secrets, and stack traces from
 responses and logs.

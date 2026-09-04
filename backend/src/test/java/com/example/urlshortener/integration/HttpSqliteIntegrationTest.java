@@ -24,6 +24,7 @@ import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.jdbc.Sql;
@@ -44,6 +45,9 @@ class HttpSqliteIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @DynamicPropertySource
     static void configureDatabase(DynamicPropertyRegistry registry) {
@@ -112,6 +116,18 @@ class HttpSqliteIntegrationTest {
         } finally {
             executor.shutdownNow();
         }
+    }
+
+    @Test
+    void persistsThePrototypeVolumeOfOneThousandLinks() throws Exception {
+        for (int index = 0; index < 1_000; index++) {
+            mockMvc.perform(post("/api/links")
+                            .contentType("application/json")
+                            .content("{\"url\":\"https://example.com/capacity/" + index + "\"}"))
+                    .andExpect(status().isCreated());
+        }
+
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM links", Integer.class)).isEqualTo(1_000);
     }
 
     private static String codeFrom(MvcResult result) throws IOException {

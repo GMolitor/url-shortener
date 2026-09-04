@@ -106,8 +106,8 @@ against the contract.
   unit tested.
 - **T08 complete:** create and redirect endpoints, configured-origin links,
   request IDs, stable errors, JSON/body validation, CORS, and SQLite health are
-  implemented and tested. The request-size filter currently relies on the
-  declared `Content-Length` and remains a hardening item for chunked requests.
+  implemented and tested. The request-size filter enforces the limit for both
+  declared-length and chunked requests.
 - **T09 complete:** the React create-link workflow includes accessible input,
   client-side usability validation, loading and failure states, result display,
   and clipboard feedback. Frontend tests, lint, formatting, and production
@@ -128,22 +128,16 @@ Validation run:
 - `backend/gradlew.bat spotlessCheck` — passed.
 
 Residual issues are documented in the approved prototype boundary: anonymous
-creation has no rate limiting or abuse controls, and the request-size filter
-relies on declared `Content-Length` for early rejection. These remain blockers
-for public deployment and require a later approved task; T13 does not silently
-change that boundary.
+creation has no rate limiting or abuse controls. These remain blockers for
+public deployment and are not part of T13 or the brownfield prototype scope.
 
 ## T15 review and approval
 
 The independent T15 review found no additional implementation defects in the
-local prototype. Human approval was granted on 2026-09-01. The following items
-are accepted as brownfield follow-up work and remain blockers for public
-deployment:
-
-- enforce the request-body limit for chunked requests rather than relying on
-  declared `Content-Length`;
-- keep the prototype README and operational documentation aligned as the
-  frontend and deployment model evolve.
+local prototype. Human approval was granted on 2026-09-01. Its brownfield
+follow-up items are tracked in `brownfield-readiness-plan.md`; A01–A05 changes
+and their tests are reviewed in the final handoff below. Public deployment
+remains out of scope.
 
 ## T16 handoff
 
@@ -167,8 +161,17 @@ The brownfield audit, findings, architectural refactoring guidance, and
 agent-ready follow-up tasks A01–A07 are documented in
 [`brownfield-readiness-plan.md`](brownfield-readiness-plan.md).
 
-The prototype handoff is approved. A01–A07 are targeted correctness,
-security, testability, reproducibility, and documentation improvements; they
-do not authorize adding a permanent database, hosted deployment, public rate
-limiting, moderation, lifecycle management, or disaster-recovery infrastructure.
-Those remain documented future-product concerns.
+The prototype handoff is approved. A01–A05 are complete; A06 and A07 remain
+partial as recorded in the final brownfield review because current evidence
+does not include a hosted CI run or clean checkout of the uncommitted state.
+These tasks do not authorize adding a permanent database, hosted deployment,
+public rate limiting, moderation, lifecycle management, or disaster-recovery
+infrastructure. Those remain documented future-product concerns.
+
+## Final brownfield review handoff
+
+The 2026-09-03 final review found the local prototype behavior suitable for a
+GO verdict, with A06 and A07 evidence caveats recorded in the brownfield plan.
+The current working-tree changes are brownfield-only: request-body enforcement,
+atomic persistence, origin/API hardening, frontend failure handling, tests, and
+documentation. No T01–T17 work was reopened or repeated.

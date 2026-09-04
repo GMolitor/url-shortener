@@ -12,6 +12,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -38,6 +41,15 @@ public class ApiExceptionHandler {
     ResponseEntity<ErrorResponse> unsupportedMediaType(
             HttpMediaTypeNotSupportedException exception, HttpServletRequest request) {
         return error(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/json", request);
+    }
+
+    @ExceptionHandler({
+        HttpRequestMethodNotSupportedException.class,
+        NoHandlerFoundException.class,
+        NoResourceFoundException.class
+    })
+    ResponseEntity<ErrorResponse> unsupportedRoute(Exception exception, HttpServletRequest request) {
+        return error(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Request is invalid", request);
     }
 
     @ExceptionHandler(CodeGenerationExhaustedException.class)

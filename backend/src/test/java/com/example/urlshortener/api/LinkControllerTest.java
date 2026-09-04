@@ -1,5 +1,6 @@
 package com.example.urlshortener.api;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -14,6 +15,8 @@ import com.example.urlshortener.domain.InvalidUrlException;
 import com.example.urlshortener.domain.Link;
 import com.example.urlshortener.repository.LinkRepository;
 import com.example.urlshortener.service.LinkCreationService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -24,6 +27,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 @SpringBootTest(
         properties = {
@@ -37,6 +41,9 @@ class LinkControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @MockBean
     private LinkCreationService creationService;
@@ -128,6 +135,31 @@ class LinkControllerTest {
     }
 
     @Test
+    void acceptsAnExactLimitJsonBody() throws Exception {
+        String prefix = "{\"url\":\"https://example.com\"}";
+        String body = prefix + " ".repeat((int) RequestIdFilter.MAX_REQUEST_BODY_BYTES - prefix.length());
+        Link link = new Link(7L, "Abc1234", "https://example.com", CREATED_AT);
+        when(creationService.create(link.destinationUrl())).thenReturn(link);
+
+        mockMvc.perform(post("/api/links").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value(link.code()));
+    }
+
+    @Test
+    void rejectsFixedLengthBodyAboveLimitWithStableEnvelopeAndRequestId() throws Exception {
+        String prefix = "{\"url\":\"https://example.com\"}";
+        String body = prefix + " ".repeat((int) RequestIdFilter.MAX_REQUEST_BODY_BYTES - prefix.length() + 1);
+
+        MvcResult result = mockMvc.perform(post("/api/links").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isPayloadTooLarge())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andReturn();
+
+        assertStableError(result, 413, "REQUEST_TOO_LARGE", "Request body is too large");
+    }
+
+    @Test
     void redirectsKnownCodeWithoutCaching() throws Exception {
         Link link = new Link(7L, "Abc1234", "https://example.com/path", CREATED_AT);
         when(linkRepository.findByCode(link.code())).thenReturn(Optional.of(link));
@@ -175,5 +207,40 @@ class LinkControllerTest {
                         .header("Origin", "https://attacker.example")
                         .header("Access-Control-Request-Method", "POST"))
                 .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
+    }
+
+    @Test
+    void mapsUnsupportedMethodToStableJsonError() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/links")).andReturn();
+
+        assertStableError(result, 400, "INVALID_REQUEST", "Request is invalid");
+    }
+
+    @Test
+    void mapsUnmappedApiPathToStableJsonError() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/not-a-route")).andReturn();
+
+        assertStableError(result, 400, "INVALID_REQUEST", "Request is invalid");
+    }
+
+    @Test
+    void mapsUnsupportedMediaTypeToStableJsonError() throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/links").contentType(MediaType.TEXT_PLAIN).content("url"))
+                .andReturn();
+
+        assertStableError(result, 415, "UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/json");
+    }
+
+    private void assertStableError(MvcResult result, int status, String errorCode, String message) throws Exception {
+        JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
+        assertThat(result.getResponse().getStatus()).isEqualTo(status);
+        assertThat(result.getResponse().getContentType()).startsWith(MediaType.APPLICATION_JSON_VALUE);
+        assertThat(body.path("status").asInt()).isEqualTo(status);
+        assertThat(body.path("errorCode").asText()).isEqualTo(errorCode);
+        assertThat(body.path("message").asText()).isEqualTo(message);
+        assertThat(body.path("requestId").asText()).isNotBlank();
+        assertThat(body.path("timestamp").asText()).isNotBlank();
+        assertThat(result.getResponse().getHeader(RequestIdFilter.REQUEST_ID_HEADER))
+                .isEqualTo(body.path("requestId").asText());
     }
 }

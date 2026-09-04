@@ -82,9 +82,9 @@ it without changing the contract.
 ## T14 status
 
 T14 is complete. The backend emits correlation-safe structured access logs with
-method, path, status, duration, and request ID, and logs storage and unexpected
-failures without exception messages, destination URLs, or SQL details. Request
-IDs are assigned before downstream filters and returned in the response header
+method, path, status, duration, and request ID for requests reaching the access
+log filter, and logs storage and unexpected failures without exception
+messages, destination URLs, or SQL details. Request IDs are assigned before downstream filters and returned in the response header
 and error envelope. Actuator reports application and SQLite health, code
 allocation retries remain bounded, and graceful shutdown is enabled with a
 ten-second shutdown phase. Failure handling, health, and shutdown behavior are
@@ -115,3 +115,37 @@ refactoring guidance, and independently assignable A01–A07 quality tasks are i
 [`brownfield-readiness-plan.md`](brownfield-readiness-plan.md). T17 is complete;
 do not add hosted production infrastructure or infer public-service scope from
 the prototype’s use of the phrase production quality.
+
+## Final brownfield review handoff — 2026-09-03
+
+STATUS: GO for the local/trusted-demo prototype; A06 is partial and A07 is not
+claimed complete until clean-checkout/CI evidence and the remaining quality-gap
+decision are closed.
+
+FILES_CHANGED: The working tree contains only brownfield backend/frontend test
+and implementation changes plus documentation updates listed in the final
+report. No T01–T17 work was reopened or repeated.
+
+TESTS_RUN: `backend/gradlew.bat test`, `backend/gradlew.bat spotlessCheck`,
+`frontend/npm.cmd ci`, `frontend/npm.cmd test`, `frontend/npm.cmd run lint`,
+`frontend/npm.cmd run format`, `frontend/npm.cmd run build`, and the focused
+`HttpSqliteIntegrationTest.persistsThePrototypeVolumeOfOneThousandLinks` test.
+
+TEST_RESULTS: All commands passed. The focused 1,000-link Gradle invocation
+took 21.885 seconds; the test case reported 2.785 seconds. The full suite
+includes the 10-client concurrent create check and the new 1,000-link check.
+
+DECISIONS: A01–A05 are accepted against the approved contracts. The prototype
+remains local/trusted-demo, one-instance, SQLite-backed, and without public
+rate limiting, moderation, lifecycle controls, or hosting infrastructure.
+
+WARNINGS: The CI workflow is present and runs the documented backend/frontend
+checks, but this review did not execute a hosted CI job or a clean checkout of
+the uncommitted brownfield state. CI also has no separate lightweight
+dependency-review step.
+
+RISKS: Early body-limit/read-failure responses bypass the low-precedence access
+log filter. This is a local observability gap requiring a human decision if
+complete rejection logging is required; production code was not changed by
+this review. Public deployment remains blocked by the documented abuse,
+destination-safety, lifecycle, backup, operations, and multi-instance gaps.

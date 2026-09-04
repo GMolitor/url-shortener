@@ -56,6 +56,7 @@ multi-instance-capable database/control plane.
 - `GET /actuator/health` reports application and SQLite health.
 - API errors use a stable JSON envelope containing status, error code, message, request ID, and timestamp.
 - JSON content type, request-body, and URL-length limits are enforced.
+- `PUBLIC_ORIGIN` and `FRONTEND_ORIGIN` must be absolute HTTP(S) origins without credentials, paths, queries, fragments, or wildcards; invalid values fail startup.
 
 ## Data requirements
 
@@ -129,3 +130,12 @@ limits, redirect headers, and configured-origin behavior.
 - No secrets, databases, build output, or business functionality are committed accidentally.
 - The documented capacity and prototype boundary are reviewed and explicitly
   approved before final prototype handoff. T17 is complete and approved.
+
+## Brownfield review evidence
+
+The final brownfield review on 2026-09-03 verified the documented backend and
+frontend commands in the working tree. The full backend test suite and
+`spotlessCheck` passed; `npm ci`, 11 frontend tests, lint, format, and build
+passed. The focused 1,000-link persistence check passed in 21.885 seconds for
+the Gradle invocation (2.785 seconds reported by the test case). This is
+right-sized local evidence, not a public load test or service-level objective.

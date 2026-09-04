@@ -2,6 +2,7 @@ package com.example.urlshortener.api;
 
 import com.example.urlshortener.domain.Link;
 import com.example.urlshortener.domain.CodeNotFoundException;
+import com.example.urlshortener.configuration.OriginValidator;
 import com.example.urlshortener.repository.LinkRepository;
 import com.example.urlshortener.service.LinkCreationService;
 import java.net.URI;
@@ -35,7 +36,7 @@ public class LinkController {
             @Value("${app.public-origin}") String publicOrigin) {
         this.creationService = creationService;
         this.linkRepository = linkRepository;
-        this.publicOrigin = publicOrigin;
+        this.publicOrigin = OriginValidator.normalize("PUBLIC_ORIGIN", publicOrigin);
     }
 
     /** Validates the request shape before delegating URL policy and persistence to the service. */

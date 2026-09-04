@@ -9,9 +9,31 @@ type LinkResponse = {
   createdAt: string;
 };
 
-type ApiError = { message?: string };
+type ApiError = { errorCode?: unknown; message?: unknown };
 
 const MAX_URL_LENGTH = 2048;
+
+function failureMessage(payload: unknown, status: number): string {
+  const apiError = payload as ApiError;
+  if (apiError && typeof apiError === 'object') {
+    if (apiError.errorCode === 'REQUEST_TOO_LARGE') {
+      return 'The request is too large. Shorten the destination URL and try again.';
+    }
+    if (apiError.errorCode === 'SERVICE_UNAVAILABLE') {
+      return 'The link service is temporarily unavailable. Try again shortly.';
+    }
+    if (typeof apiError.message === 'string' && apiError.message.length > 0) {
+      return apiError.message;
+    }
+  }
+  if (status === 413) {
+    return 'The request is too large. Shorten the destination URL and try again.';
+  }
+  if (status === 503) {
+    return 'The link service is temporarily unavailable. Try again shortly.';
+  }
+  return 'The link could not be created. Try again.';
+}
 
 function validateUrl(value: string): string | null {
   if (value.length === 0 || value.length > MAX_URL_LENGTH) {
@@ -73,10 +95,7 @@ export function App() {
         | LinkResponse
         | ApiError;
       if (!response.ok) {
-        throw new Error(
-          ('message' in payload && payload.message) ||
-            'The link could not be created. Try again.',
-        );
+        throw new Error(failureMessage(payload, response.status));
       }
       setResult(payload as LinkResponse);
     } catch (submissionError) {

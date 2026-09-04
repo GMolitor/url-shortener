@@ -152,6 +152,7 @@ components:
 x-contract:
   publicOrigin: PUBLIC_ORIGIN
   corsOrigin: configured local frontend origin
+  originValidation: absolute HTTP(S) origin without credentials, path, query, fragment, or wildcard; invalid configuration fails startup
   generatedCodeReservedPrefixes: [/api, /actuator, /assets]
   redirectStatus: 302
   redirectCacheControl: no-store
