@@ -10,7 +10,7 @@ public class WebConfiguration implements WebMvcConfigurer {
     private final String frontendOrigin;
 
     public WebConfiguration(@Value("${app.frontend-origin:http://localhost:5173}") String frontendOrigin) {
-        this.frontendOrigin = frontendOrigin;
+        this.frontendOrigin = OriginValidator.normalize("FRONTEND_ORIGIN", frontendOrigin);
     }
 
     @Override

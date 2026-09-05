@@ -15,14 +15,14 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 /** Emits correlation-safe access logs for every request, including failures. */
 @Component
-@Order(Ordered.LOWEST_PRECEDENCE)
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public class AccessLogFilter extends OncePerRequestFilter {
     private static final Logger LOGGER = LoggerFactory.getLogger(AccessLogFilter.class);
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        String requestId = (String) request.getAttribute(RequestIdFilter.REQUEST_ID_ATTRIBUTE);
+        String requestId = RequestIdFilter.ensureRequestId(request, response);
         long startedAt = System.nanoTime();
         try {
             MDC.put("requestId", requestId);

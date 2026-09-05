@@ -3,6 +3,7 @@ package com.example.urlshortener.api;
 import com.example.urlshortener.domain.CodeGenerationExhaustedException;
 import com.example.urlshortener.domain.CodeNotFoundException;
 import com.example.urlshortener.domain.InvalidUrlException;
+import com.example.urlshortener.orchestration.OrchestrationException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import org.slf4j.Logger;
@@ -12,6 +13,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -40,6 +44,15 @@ public class ApiExceptionHandler {
         return error(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/json", request);
     }
 
+    @ExceptionHandler({
+        HttpRequestMethodNotSupportedException.class,
+        NoHandlerFoundException.class,
+        NoResourceFoundException.class
+    })
+    ResponseEntity<ErrorResponse> unsupportedRoute(Exception exception, HttpServletRequest request) {
+        return error(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Request is invalid", request);
+    }
+
     @ExceptionHandler(CodeGenerationExhaustedException.class)
     ResponseEntity<ErrorResponse> codeGenerationFailure(
             CodeGenerationExhaustedException exception, HttpServletRequest request) {
@@ -50,6 +63,11 @@ public class ApiExceptionHandler {
     ResponseEntity<ErrorResponse> storageFailure(DataAccessException exception, HttpServletRequest request) {
         logFailure("storage_failure", exception, request);
         return error(HttpStatus.INTERNAL_SERVER_ERROR, "STORAGE_FAILURE", "Storage operation failed", request);
+    }
+
+    @ExceptionHandler(OrchestrationException.class)
+    ResponseEntity<ErrorResponse> orchestrationFailure(OrchestrationException exception, HttpServletRequest request) {
+        return error(exception.status(), exception.errorCode(), exception.getMessage(), request);
     }
 
     @ExceptionHandler(Exception.class)

@@ -6,19 +6,18 @@ The system is a local-first modular monolith:
 
 ```text
 Browser -> React UI -> Spring Boot API -> SQLite
-                              |
-                              v
-                       Structured logs/health
+                               |
+                               +-> Structured logs/health
+                               +-> bounded analytics writer
+                               +-> orchestration control-plane API
 ```
 
 The API is independently usable. No external service is required for local operation.
 
-This architecture supports the initial greenfield scenario prototype and
-preserves a path to the eventual production-ready service. The prototype is
-local/trusted-demo only, single-instance, and bounded by the capacity targets
-in `requirements.md`. Production readiness is a later milestone and requires
-explicitly approved changes to deployment, abuse prevention, operations, and
-data durability.
+This architecture supports a production-ready local prototype. It
+is local/trusted-demo only, single-instance, and bounded by the capacity targets
+in `requirements.md`. Public hosting, multi-instance operation, and production
+operations are intentionally outside the prototype boundary.
 
 ## Components
 
@@ -28,13 +27,19 @@ data durability.
 - **Repository layer**: Spring JDBC operations against SQLite; SQL is isolated here.
 - **Configuration/observability**: environment settings, CORS, request IDs, structured logs, and health integration.
 - **SQLite**: durable source of truth for a single application instance.
+- **Analytics module**: redirect event publishing and time-window aggregate reads.
+- **Orchestration module**: durable run/task coordination, approvals, audit, and
+  terminal metrics for locally supplied workers.
 - **Data model contract**: [`data-model.md`](data-model.md) defines the MVP
-  `links` table, constraints, indexes, timestamps, and migration contract.
+  `links` table and the V2 local orchestration/analytics schema additions.
 
 ## API boundary
 
 - `POST /api/links`: create a link.
 - `GET /{code}`: redirect.
+- `GET /api/analytics/{code}`: local click aggregates.
+- `/api/orchestration/runs...`: local orchestration run/task coordination and
+  evidence operations.
 - `GET /actuator/health`: health.
 - Reserve `/api`, `/actuator`, `/assets`, and frontend routes from generated codes.
 
@@ -46,9 +51,31 @@ The published contract is [`openapi.yaml`](openapi.yaml).
 
 ## Data flow
 
-Creation validates input, generates a code, persists the mapping, and returns the persisted result. Redirect lookup queries by the unique indexed code and returns a 302 response. Destination URLs are never fetched by the service.
+Creation validates input, generates a code, persists the mapping, and returns the persisted result. Redirect lookup queries by the unique indexed code and returns a 302 response. After the response data is prepared, the redirect path offers a code/time event to the bounded asynchronous analytics publisher. Destination URLs are never fetched by the service.
 
-Analytics is not part of the MVP. If later introduced, redirect handling must emit non-blocking events so analytics cannot delay or break redirects.
+Analytics persistence is intentionally best-effort: queue-full and writer
+failures are isolated from redirect handling, and shutdown may drop queued events
+after the bounded graceful-drain period. Aggregates are hourly UTC buckets over a
+validated window of at most 366 days. Events contain only the short code and UTC
+time; there is no client identity, IP, user-agent, destination, retention job, or
+analytics UI.
+
+### Local orchestration boundary
+
+The repository contains a Spring Boot orchestration control plane. It durably
+stores runs, tasks, dependencies, attempts, approvals, graph versions, audit
+events, and terminal per-run metrics in SQLite. It validates dependency and
+fallback graphs, applies entry/task/exit gates, supports worker claims and
+results, bounded retry classification, fallback activation, cancellation,
+rollback evidence, policy guardrails, and graph-versioned replanning.
+
+The service records state and evidence; it does not execute task actions. A
+caller polls ready tasks, claims them, performs the work, and submits a result.
+There is no scheduler, queue, worker process, lease/heartbeat, timeout,
+automatic recovery, fairness policy, or external-agent runtime client. The
+external Orchestration Agent used for this development session is therefore a
+separate runtime concern, documented in
+[`orchestration-evidence.md`](orchestration-evidence.md).
 
 ## Cross-cutting architecture constraints
 
@@ -65,8 +92,10 @@ Analytics is not part of the MVP. If later introduced, redirect handling must em
 
 The API validates HTTP/HTTPS schemes, malformed URLs, embedded credentials,
 control characters, URL length, request-body size, and JSON content type at the
-boundary. URL policy is shared with the domain layer so UI validation is only a
-usability aid and never the security authority. A centralized error mapper
+boundary. The request-body guard reads at most one byte beyond the 4,096-byte
+limit, including for chunked transfer encoding. URL policy is shared with the
+domain layer so UI validation is only a usability aid and never the security
+authority. A centralized error mapper
 returns the T04 error envelope with a request ID and UTC timestamp while
 redacting destination URLs, SQL details, secrets, and stack traces from
 responses and logs.
@@ -78,8 +107,8 @@ fail clearly when migrations cannot be applied or validated. Repository code is
 the only layer allowed to issue SQL, and the database uniqueness constraint is
 the authority for code collisions. Writes must be durable before a successful
 create response. SQLite is operated as one database owned by one backend
-instance; backup, restore, integrity checking, and corruption recovery are
-production-readiness requirements.
+instance. Backup, restore, integrity checking, and corruption recovery are
+future public-service requirements, not prototype requirements.
 
 ### Concurrency, retries, and observability
 
@@ -90,14 +119,21 @@ structured access/failure logs, timing, and database/migration health are
 cross-cutting responsibilities, with controlled responses for database
 failures.
 
-### Production-readiness gate
+`V1__create_links.sql` owns link data and `V2__orchestration_and_analytics.sql`
+owns the local orchestration and click-event tables.
 
-The prototype must not be exposed to public or untrusted traffic. Before that
-boundary changes, the design must add rate limiting and quotas, abuse and
-moderation controls, link disable/removal or expiration, backup procedures,
-operational alerting, a multi-instance-capable database/control plane, and
-validated capacity/SLO targets. These are follow-up design and implementation
-work, not implicit features of the prototype.
+The analytics writer is also bounded and asynchronous; it is allowed to lose
+events under queue saturation, writer failure, or forced shutdown so it cannot
+turn analytics storage into a redirect dependency.
+
+### Public-deployment gate
+
+The prototype must not be exposed to public or untrusted traffic. If a future
+project changes that boundary, the design must add rate limiting and quotas,
+abuse and moderation controls, link disable/removal or expiration, backup
+procedures, operational alerting, a multi-instance-capable database/control
+plane, and validated capacity/SLO targets. These are future-product work, not
+implicit features of this prototype.
 
 ## Architectural decisions
 
@@ -139,12 +175,21 @@ Flyway migrations are the single schema-evolution mechanism. Ad hoc startup DDL,
 ORM-generated schema changes, and repository-side table creation are rejected
 because they make clean installs, upgrades, and rollback analysis ambiguous.
 
-### ADR-010: Prototype-to-production boundary
+### ADR-010: Prototype-to-public-service boundary
 
-The greenfield prototype optimizes for a small, inspectable local system. Its
-interfaces and repository boundary should remain production-evolvable, but no
-production capability is assumed until it is explicitly designed, tested, and
-approved in a later task.
+The prototype optimizes for a small, inspectable local system. Its interfaces
+and repository boundary should remain production-evolvable, but hosted
+production capability is not assumed or required. Any future public service
+must be separately designed, tested, and approved.
+
+### ADR-011: Local prototype deployment
+
+The local evaluation environment runs one Spring Boot process, one SQLite file, and one
+separately served React/Vite frontend. PostgreSQL, containers, cloud resources,
+distributed controls, and permanent hosting are rejected for this prototype
+because they add deployment complexity without improving the evaluated local
+behavior. The code should remain easy to replace or extend later through its
+repository and module boundaries.
 
 ## Correctness, reliability, and optional optimizations
 
@@ -157,12 +202,18 @@ ports, and encoding), concurrent creation, collision exhaustion, database
 failure handling, clean/latest migration paths, configured-origin behavior,
 CORS restrictions, and request/log redaction.
 
-**Optional:** redirect caching, WAL tuning, metrics, tracing, asynchronous analytics, PostgreSQL migration, distributed rate limiting, and horizontal scaling.
+**Optional/future:** redirect caching, WAL tuning, aggregate operational metrics,
+tracing, hosted analytics and retention, PostgreSQL migration, distributed rate
+limiting, and horizontal scaling. The local T25 analytics and T24 orchestration
+modules are implemented capabilities within the approved boundary.
 
 ## Known limitations
 
 - Anonymous creation is abuse-prone.
 - SQLite does not support high write concurrency or multiple application instances.
-- There is no link deletion, disabling, expiration, ownership, or analytics.
+- There is no link deletion, disabling, expiration, or ownership. Analytics has
+  no identity tracking, retention/deletion operation, dashboard, delivery
+  guarantee, or public-service isolation.
 - Destination safety is syntactic only.
-- Advanced production operations are not included.
+- Hosted production operations are not included; local correctness and
+  diagnostics are included.

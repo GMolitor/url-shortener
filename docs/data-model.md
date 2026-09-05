@@ -2,10 +2,10 @@
 
 ## Scope
 
-The prototype has one business table, `links`. SQLite is the durable source of
-truth for one backend instance. This document defines the schema contract for
-T05/T06; it does not authorize repository or migration implementation outside
-those tasks.
+The URL-shortener mapping remains one business table, `links`. V2 adds local
+orchestration and analytics tables for the approved T24/T25 capabilities. SQLite
+is the durable source of truth for one backend instance. This document defines
+the schema contract and does not authorize a hosted or multi-instance design.
 
 ## `links` table
 
@@ -69,6 +69,8 @@ not a pre-check query, decides whether a code is available.
 - Flyway is the sole schema-evolution mechanism.
 - The first business migration is `V1__create_links.sql` and creates the table
   above in a clean database.
+- `V2__orchestration_and_analytics.sql` adds the local orchestration state and
+  analytics click-event tables described below.
 - Later changes use monotonically versioned migrations and must not edit an
   already-applied migration.
 - T06 must test clean installation, startup against the latest schema,
@@ -77,10 +79,36 @@ not a pre-check query, decides whether a code is available.
 - Migration application is expected to be transactional where SQLite/Flyway
   support permits; a failed startup must not advertise a healthy database.
 - Schema changes must remain compatible with the one-instance SQLite boundary
-  until a separately approved production database design replaces it.
+  until a separately approved public-service database design replaces it.
+
+## Local analytics tables
+
+`analytics_click_events` stores one row per accepted redirect event:
+
+| Column | SQLite type | Nullability | Constraints | Purpose |
+|---|---|---:|---|---|
+| `id` | `INTEGER` | NOT NULL | `PRIMARY KEY` | Event identity |
+| `code` | `TEXT` | NOT NULL | binary/case-sensitive | Short-code dimension |
+| `occurred_at` | `TEXT` | NOT NULL | UTC instant in ISO-8601/RFC-3339 form | Event time |
+
+The `(code, occurred_at)` index supports the total and hourly aggregate reads.
+The table contains no destination URL, IP address, user agent, or client
+identity. There is no retention or deletion job; local rows remain until the
+database is reset or otherwise managed through the runbook. The asynchronous
+publisher may drop events when its bounded queue or writer cannot accept them.
+
+## Local orchestration tables
+
+`V2__orchestration_and_analytics.sql` also creates durable tables for runs,
+tasks, dependencies, attempts, approvals, graph versions, audit events, and
+per-run metrics. Their state and relationship constraints are defined in that
+migration. They support local worker/API coordination; no table makes the
+service an agent executor or an externally authenticated control plane.
 
 ## Out of scope
 
-The MVP has no aliases, expiration, deletion/disable state, ownership,
-analytics, click counters, or destination deduplication. Adding any of these
-requires a new migration and an updated approved API/domain contract.
+The prototype has no aliases, expiration, deletion/disable state, ownership,
+analytics identity dimensions, analytics retention/deletion operation,
+destination deduplication, or hosted analytics service. Adding public lifecycle,
+identity, retention, or multi-instance behavior requires a new migration and an
+updated approved API/domain contract.

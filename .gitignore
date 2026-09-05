@@ -1,6 +1,8 @@
 # Java/Gradle
 .gradle/
 **/.gradle-user-home/
+/.gradle-home/
+/backend/.gradle-home/
 build/
 out/
 
