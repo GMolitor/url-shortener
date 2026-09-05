@@ -28,6 +28,7 @@ public class RequestIdFilter extends OncePerRequestFilter {
     public static final String REQUEST_ID_ATTRIBUTE = RequestIdFilter.class.getName() + ".requestId";
     public static final String REQUEST_ID_HEADER = "X-Request-Id";
     public static final long MAX_REQUEST_BODY_BYTES = 4096;
+    public static final long MAX_ORCHESTRATION_REQUEST_BODY_BYTES = MAX_REQUEST_BODY_BYTES;
 
     /** Assigns a correlation ID and bounds create-request bytes before deserialization. */
     @Override
@@ -35,12 +36,13 @@ public class RequestIdFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         String requestId = ensureRequestId(request, response);
 
-        if (!isCreateRequest(request)) {
+        if (!isBoundedRequest(request)) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        if (request.getContentLengthLong() > MAX_REQUEST_BODY_BYTES) {
+        long maxBodyBytes = maxBodyBytes(request);
+        if (request.getContentLengthLong() > maxBodyBytes) {
             writeError(response, HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE, "REQUEST_TOO_LARGE",
                     "Request body is too large", requestId);
             return;
@@ -48,7 +50,7 @@ public class RequestIdFilter extends OncePerRequestFilter {
 
         byte[] body;
         try {
-            body = readBodyAtMostLimit(request.getInputStream());
+            body = readBodyAtMostLimit(request.getInputStream(), maxBodyBytes);
         } catch (IOException exception) {
             writeError(response, HttpServletResponse.SC_BAD_REQUEST, "INVALID_REQUEST", "Request is invalid", requestId);
             return;
@@ -71,16 +73,24 @@ public class RequestIdFilter extends OncePerRequestFilter {
         return requestId;
     }
 
-    private boolean isCreateRequest(HttpServletRequest request) {
-        return request.getRequestURI().equals("/api/links") && request.getMethod().equalsIgnoreCase("POST");
+    private boolean isBoundedRequest(HttpServletRequest request) {
+        if (!request.getMethod().equalsIgnoreCase("POST")) return false;
+        return request.getRequestURI().equals("/api/links")
+                || request.getRequestURI().startsWith("/api/orchestration/");
+    }
+
+    private long maxBodyBytes(HttpServletRequest request) {
+        return request.getRequestURI().startsWith("/api/orchestration/")
+                ? MAX_ORCHESTRATION_REQUEST_BODY_BYTES
+                : MAX_REQUEST_BODY_BYTES;
     }
 
     /** Returns null after reading only one byte beyond the permitted body size. */
-    private byte[] readBodyAtMostLimit(InputStream inputStream) throws IOException {
-        ByteArrayOutputStream body = new ByteArrayOutputStream((int) MAX_REQUEST_BODY_BYTES + 1);
+    private byte[] readBodyAtMostLimit(InputStream inputStream, long maxBodyBytes) throws IOException {
+        ByteArrayOutputStream body = new ByteArrayOutputStream((int) maxBodyBytes + 1);
         byte[] buffer = new byte[1024];
         while (true) {
-            int remaining = (int) MAX_REQUEST_BODY_BYTES + 1 - body.size();
+            int remaining = (int) maxBodyBytes + 1 - body.size();
             int read = inputStream.read(buffer, 0, Math.min(buffer.length, remaining));
             if (read == -1) {
                 return body.toByteArray();
@@ -90,7 +100,7 @@ public class RequestIdFilter extends OncePerRequestFilter {
                 if (singleByte == -1) {
                     return body.toByteArray();
                 }
-                if (body.size() == MAX_REQUEST_BODY_BYTES) {
+                if (body.size() == maxBodyBytes) {
                     return null;
                 }
                 body.write(singleByte);

@@ -18,6 +18,9 @@ T06,T08,T12 -> T14 Reliability/observability validation
 T10,T11,T12,T13,T14 -> T15 Code review
 T04,T12,T13,T14 -> T16 Documentation
 T15,T16 -> T17 Release readiness
+T17 -> T18 -> T24,T25
+T24,T25 -> T19,T20
+T19,T20 -> T21 -> T22 -> T23
 ```
 
 ## Tasks
@@ -39,6 +42,14 @@ T15,T16 -> T17 Release readiness
 - **T15 Code review**: independent requirements, architecture, security, scope, and test-evidence review. **Approved.**
 - **T16 Documentation**: setup, API, architecture, limitations, operations, and testing runbook. **Complete.**
 - **T17 Release readiness**: clean-checkout verification, dependency review, acceptance checklist, and go/no-go. **Complete and approved 2026-09-03.**
+- **T18 Assignment reconciliation**: decide and record how the external Orchestration Agent satisfies the assignment's orchestration-layer requirement, and explicitly decide whether analytics are implemented, demonstrated as deferred, or recorded as an assignment gap. **Approved 2026-09-04; repository-contained implementation authorized.**
+- **T24 Orchestration service implementation**: implement the local repository-contained orchestration control plane with durable run/task state, dependency graphs, entry/exit gates, sequential and parallel execution with synchronization, approvals, bounded retries, fallback, rollback, safe-stop, policy guardrails, audit events, reliability metrics, and dynamic replanning. **Complete 2026-09-04; implementation and full validation passed.**
+- **T25 Analytics implementation**: implement redirect analytics with durable event capture that cannot delay or break redirects, aggregate read APIs/UI as appropriate, tests, and documented retention/privacy boundaries. **Complete 2026-09-04; implementation and full validation passed.**
+- **T19 Orchestration evidence package**: document the Orchestration Agent's lifecycle, dependency graph, gates, sequential and parallel paths, synchronization, context and decision lineage, human approvals, retries, fallback, rollback, safe-stop behavior, policy guardrails, audit observability, reliability metrics, and dynamic replanning. Attach representative run records or templates where available; identify capabilities handled manually or not evidenced. **Complete 2026-09-04; evidence package in [orchestration-evidence.md](orchestration-evidence.md).**
+- **T20 Scenario demonstrations**: produce case studies for the greenfield prototype, brownfield hardening, and an ambiguous requirement. Each must show input, decomposition, assigned agents, dependencies, decisions, issue handling, approvals, validation, outputs, and limitations. **Complete 2026-09-04; evidence package in [scenario-demonstrations.md](scenario-demonstrations.md).**
+- **T21 Final engineering summary and traceability**: add an assignment-to-artifact traceability matrix and a single final engineering summary covering rationale, architecture, artifacts, risks, trade-offs, validation, assumptions, limitations, and the prototype-versus-public-service boundary. Link it from the README. **Complete 2026-09-04; summary in [final-engineering-summary.md](final-engineering-summary.md).**
+- **T22 Documentation quality pass**: reconcile README, requirements, architecture, runbook, handoff, task statuses, and OpenAPI references; remove stale claims; verify links and commands; correct visible encoding/typography defects; and state the orchestration boundary and analytics decision consistently. **Complete 2026-09-04; documentation links, OpenAPI YAML parsing, and diff validation passed.**
+- **T23 Documentation release review**: independently review T18-T22 against the assignment PDF, confirm no application code was changed, record open evidence gaps and approved scope exceptions, and obtain final human approval. **Complete and approved 2026-09-04.**
 
 ## Parallel groups
 
@@ -53,6 +64,12 @@ T15,T16 -> T17 Release readiness
 `T01 -> T02 -> T03 -> T04 -> T05 -> T06 -> T08 -> T12 -> T13 -> T15 -> T17`
 
 No task may expand the MVP to authentication, aliases, expiration, analytics, public deployment, or unrelated infrastructure without a new approved task.
+
+The assignment-reconciliation work now authorizes T24/T25 implementation within
+the existing Spring Boot/React/SQLite local boundary. T24/T25 must not add
+public hosting, cloud infrastructure, or deferred public-service controls.
+T19/T20 remain evidence and demonstration work and must distinguish repository
+service behavior from the external agent runtime used to execute this task.
 
 ## T01 handoff and approval gate
 

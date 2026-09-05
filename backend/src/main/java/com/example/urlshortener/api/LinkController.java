@@ -1,6 +1,8 @@
 package com.example.urlshortener.api;
 
 import com.example.urlshortener.domain.Link;
+import com.example.urlshortener.analytics.ClickEvent;
+import com.example.urlshortener.analytics.ClickEventPublisher;
 import com.example.urlshortener.domain.CodeNotFoundException;
 import com.example.urlshortener.configuration.OriginValidator;
 import com.example.urlshortener.repository.LinkRepository;
@@ -8,7 +10,9 @@ import com.example.urlshortener.service.LinkCreationService;
 import java.net.URI;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import java.time.Clock;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -28,15 +32,30 @@ public class LinkController {
 
     private final LinkCreationService creationService;
     private final LinkRepository linkRepository;
+    private final ClickEventPublisher clickEventPublisher;
+    private final Clock clock;
     private final String publicOrigin;
 
+    @Autowired
     public LinkController(
             LinkCreationService creationService,
             LinkRepository linkRepository,
+            ClickEventPublisher clickEventPublisher,
             @Value("${app.public-origin}") String publicOrigin) {
+        this(creationService, linkRepository, clickEventPublisher, publicOrigin, Clock.systemUTC());
+    }
+
+    LinkController(
+            LinkCreationService creationService,
+            LinkRepository linkRepository,
+            ClickEventPublisher clickEventPublisher,
+            String publicOrigin,
+            Clock clock) {
         this.creationService = creationService;
         this.linkRepository = linkRepository;
+        this.clickEventPublisher = clickEventPublisher;
         this.publicOrigin = OriginValidator.normalize("PUBLIC_ORIGIN", publicOrigin);
+        this.clock = clock;
     }
 
     /** Validates the request shape before delegating URL policy and persistence to the service. */
@@ -66,6 +85,7 @@ public class LinkController {
         HttpHeaders headers = new HttpHeaders();
         headers.setLocation(URI.create(link.get().destinationUrl()));
         headers.setCacheControl(CacheControl.noStore());
+        clickEventPublisher.publish(new ClickEvent(code, clock.instant()));
         return new ResponseEntity<>(headers, HttpStatus.FOUND);
     }
 }

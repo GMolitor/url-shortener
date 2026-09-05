@@ -18,7 +18,7 @@ Audit/scope update: 2026-09-03
 T17 status: **Complete and approved by the human reviewer.**  
 Code changes made by this planning update: none.
 
-## Final brownfield review status — 2026-09-03
+## Final brownfield review status (2026-09-03)
 
 The final review verified the current working-tree implementation and tests
 against the approved T01–T17 contracts without reopening or repeating those
@@ -254,7 +254,8 @@ Do not assign these as implementation tasks for this prototype:
 - public rate limiting, quotas, abuse moderation, reputation services, and
   anonymous-traffic identity controls;
 - link ownership, authenticated administration, takedown, deletion, disabling,
-  expiration, analytics, or audit retention beyond the MVP;
+  expiration, hosted analytics, analytics identity tracking, or audit retention
+  beyond the approved local capability;
 - PostgreSQL or another hosted multi-instance database/control plane;
 - cloud/container deployment, TLS/proxy infrastructure, secret management,
   autoscaling, operational alerting, log shipping, backups, restore drills, or

@@ -12,7 +12,10 @@ Provide a local-first URL-shortening service that accepts a valid destination UR
 - Unknown codes return a controlled 404 response.
 - The React UI provides submission, validation, loading, errors, result display, and copy-to-clipboard behavior.
 - The API remains independently usable from the UI.
-- Authentication, aliases, expiration, editing, deletion, and analytics are excluded from the MVP.
+- Authentication, aliases, expiration, editing, deletion, and link ownership are
+  excluded from the MVP. T18/T25 add the approved local analytics capability
+  described below; hosted analytics, identity tracking, and retention operations
+  remain deferred.
 
 ## Non-functional requirements
 
@@ -53,6 +56,9 @@ multi-instance-capable database/control plane.
 
 - `POST /api/links` accepts `{ "url": "https://example.com" }` and returns `201 Created` with code, short URL, destination URL, and UTC creation timestamp.
 - `GET /{code}` returns `302 Found` and a `Location` header for known codes.
+- `GET /api/analytics/{code}` returns a total and hourly UTC buckets for a valid
+  short code and time window. It does not expose destination or client identity
+  data.
 - `GET /actuator/health` reports application and SQLite health.
 - API errors use a stable JSON envelope containing status, error code, message, request ID, and timestamp.
 - JSON content type, request-body, and URL-length limits are enforced.
@@ -65,6 +71,22 @@ multi-instance-capable database/control plane.
 - Codes are case-sensitive and initially seven characters unless a later approved decision changes the capacity bound.
 - Database uniqueness is the collision authority; collision retries are bounded.
 - Versioned migrations initialize and evolve the schema.
+
+### Local analytics requirements
+
+- A successful lookup publishes one event containing the case-sensitive short
+  code and the UTC occurrence time.
+- Event persistence is asynchronous behind a bounded queue. Queue pressure or
+  analytics storage failure must not delay, fail, or change the redirect
+  response; an event may be lost under those failure conditions.
+- The aggregate API accepts optional RFC-3339 `from` and `to` parameters. The
+  default window is the preceding 24 hours, the window must be ordered and no
+  longer than 366 days, and the implementation permits `to` up to five seconds
+  ahead of its current UTC clock.
+- Analytics data is local SQLite data. The event model contains no IP address,
+  user agent, destination URL, or client identity. No automated retention or
+  deletion operation is implemented; local data remains subject to the
+  database reset/backup procedures.
 
 The complete HTTP contract is [`openapi.yaml`](openapi.yaml). Implementations
 must conform to that contract, including the stable error envelope, request
@@ -87,7 +109,11 @@ limits, redirect headers, and configured-origin behavior.
 - Database and migration failures produce controlled responses and actionable logs.
 - Request IDs, structured access/failure logs, timing, and health checks are required.
 - Concurrency and collision behavior must be tested.
-- Caching, metrics, tracing, distributed rate limiting, backups, and analytics are deferred optimizations or production follow-up.
+- Caching, tracing, distributed rate limiting, backups, hosted analytics,
+  identity tracking, retention operations, and public-service monitoring are
+  deferred optimizations or production follow-up. The local T25 analytics
+  event and aggregate API are implemented, but are not a public analytics
+  service or operational dashboard.
 
 ## Explicit assumptions
 
@@ -97,6 +123,8 @@ limits, redirect headers, and configured-origin behavior.
 - Maximum URL length is 2048 characters.
 - Public origin is configuration, not request-derived state.
 - React and Spring run as separate local development processes.
+- Redirect analytics are best-effort local observations, not a redirect
+  correctness or delivery guarantee.
 - The capacity and latency targets above are planning targets for validation,
   not a production service-level objective.
 - Public deployment is out of scope for the prototype; anonymous rate limiting
@@ -114,7 +142,7 @@ limits, redirect headers, and configured-origin behavior.
 | Code format | ASSUMPTION | Seven-character case-sensitive Base62 |
 | Redirect code | ASSUMPTION | HTTP 302 |
 | Rate limiting | DEFERRED for this local prototype; required for public deployment | Document local-only restriction; require controls before public use |
-| Analytics | DEFERRED | No click/event data in MVP |
+| Analytics | IMPLEMENTED locally under approved T18/T25 exception | Code/time click events, bounded non-blocking persistence, and aggregate reads; hosted analytics and retention remain deferred |
 | Deployment scale | ASSUMPTION | Local single instance |
 
 ## Acceptance criteria

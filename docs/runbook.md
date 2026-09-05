@@ -76,6 +76,9 @@ Expected API behavior:
 - `POST /api/links`: `201` after durable persistence.
 - `GET /{code}`: `302` with `Location` and `Cache-Control: no-store` for a
   known seven-character Base62 code.
+- `GET /api/analytics/{code}`: `200` with `code`, `totalClicks`, the resolved
+  `from`/`to` instants, and hourly UTC `buckets`. Invalid codes or windows
+  return `400`; a valid code with no events returns empty aggregates.
 - Unknown codes: `404` with `CODE_NOT_FOUND`.
 - Invalid JSON, fields, URLs, or code paths: `400` with the appropriate stable
   error code.
@@ -96,6 +99,56 @@ Error responses contain `status`, `errorCode`, `message`, `requestId`, and
 UTC `timestamp`. Messages and logs do not expose stack traces, SQL details,
 secrets, or full destination URLs.
 
+### Analytics operations
+
+Redirect handling publishes a code/time event to a single background writer
+through a 1,024-entry bounded queue. Publishing does not wait for SQLite and
+does not change the `302` response. A full queue, writer exception, or forced
+shutdown can drop an event; the writer logs only bounded diagnostic fields.
+
+Call the aggregate API with optional RFC-3339 UTC parameters:
+
+```powershell
+Invoke-RestMethod `
+  -Uri 'http://localhost:8080/api/analytics/Abc1234?from=2026-09-03T00:00:00Z&to=2026-09-04T00:00:00Z'
+```
+
+With no parameters, the API uses the preceding 24 hours. `from` must precede
+`to`, the window may be at most 366 days, and `to` may be up to five seconds
+ahead of the server clock. The endpoint returns only short-code/time-derived
+aggregates. It is unauthenticated like the other prototype APIs, has no client
+identity or IP/user-agent capture, and has no retention or deletion operation.
+Rows remain in the local SQLite file until that file is otherwise managed.
+
+### Orchestration operations
+
+The `/api/orchestration/runs` API is a repository-contained local control plane:
+
+| Operation | Purpose |
+|---|---|
+| `POST /api/orchestration/runs` | Create a `PLANNED` run from a task graph; returns `201` and the run data |
+| `GET /api/orchestration/runs/{runId}` | Read run, task, and approval state |
+| `GET .../{runId}/ready-tasks` | List tasks currently in `READY` state |
+| `POST .../{runId}/start` | Pass the entry gate and start an approved run |
+| `POST .../{runId}/approvals` | Record `ENTRY`, `TASK`, or `EXIT` approval/rejection |
+| `POST .../{runId}/tasks/{taskKey}/claim` | Claim a ready task for a worker ID |
+| `POST .../{runId}/tasks/{taskKey}/result` | Submit the claiming worker's success/failure result |
+| `POST .../{runId}/cancel` | Safe-stop a non-terminal run |
+| `POST .../{runId}/rollback` | Record rollback state and metadata |
+| `POST .../{runId}/replans` | Add validated tasks using the current graph version |
+| `GET .../{runId}/attempts` and `GET .../{runId}/tasks/{taskKey}/attempts` | Read attempt history |
+| `GET .../{runId}/audit-events` | Read bounded audit transitions |
+| `GET .../{runId}/metrics` | Read terminal per-run metrics when a metrics row exists |
+
+The full payload and response shapes are in [openapi.yaml](openapi.yaml).
+The service validates graph cycles, fallback targets, task limits, policy terms,
+and bounded text. It records state and evidence but does not execute actions.
+Callers perform polling and work execution. There is no scheduler, queue,
+worker process, authentication/authorization, lease or heartbeat, timeout,
+automatic recovery, or external-agent runtime adapter. The runtime used for
+this development session is documented separately in
+[orchestration-evidence.md](orchestration-evidence.md).
+
 ## Health and observability
 
 Check application and SQLite health:
@@ -115,7 +168,9 @@ messages.
 
 The database is created at `DATABASE_PATH` and migrations are applied by
 Flyway. The current business migration is `V1__create_links.sql`, which owns
-the `links` table and its constraints. Never edit an already-applied migration.
+the `links` table and its constraints. `V2__orchestration_and_analytics.sql`
+owns the local orchestration and analytics tables. Never edit an already-applied
+migration.
 
 For a checksum mismatch or intentionally disposable local database:
 
@@ -136,6 +191,10 @@ before any public deployment.
 Stop `bootRun` with `Ctrl+C`; Spring Boot uses graceful shutdown with a
 ten-second shutdown phase. If startup fails, inspect the first migration or
 datasource error, correct configuration or file permissions, and restart.
+
+During shutdown the analytics writer attempts to drain queued events for up to
+five seconds. A forced shutdown can discard the remaining queue; this is an
+accepted local analytics limitation and does not block backend shutdown.
 
 The prototype is single-instance. Do not point multiple backend processes at
 the same SQLite file or expose the service to untrusted public traffic.
@@ -165,7 +224,8 @@ npm run build
 The backend suite covers URL policy, secure code generation, reserved paths,
 collision retries, API/error behavior, CORS and origin handling, SQLite
 persistence, migration constraints, restart persistence, concurrency, health,
-failure handling, and request/log redaction. The frontend suite covers the
+failure handling, request/log redaction, analytics, and orchestration behavior.
+The frontend suite covers the
 accessible form, client validation, loading and error states, successful result
 display, network fallback, and clipboard success/failure.
 
@@ -189,5 +249,10 @@ Before handing off a change:
 - SQLite is not suitable for high write concurrency or multiple instances.
 - Links cannot be deleted, disabled, expired, or assigned to an owner.
 - Destination safety is syntactic; the service does not assess reputation.
-- Backups, metrics, tracing, distributed controls, and public deployment
-  operations are outside the prototype.
+- Analytics is local and best-effort: there is no identity tracking, retention
+  or deletion job, dashboard, delivery guarantee, or public analytics service.
+- Orchestration metrics are terminal per-run summaries rather than aggregate
+  operational metrics; orchestration has no auth, scheduler, leases, timeouts,
+  or worker recovery.
+- Backups, tracing, distributed controls, and public deployment operations are
+  outside the prototype.

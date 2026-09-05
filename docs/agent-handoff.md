@@ -73,11 +73,11 @@ migration tests.
 ## T04 status
 
 The API contract was approved on 2026-08-31 and is complete in
-[`openapi.yaml`](openapi.yaml). It
-defines create, redirect, and health operations; payloads; stable errors;
+[`openapi.yaml`](openapi.yaml). It defines create, redirect, health, local
+analytics, and local orchestration operations; payloads; stable errors;
 validation/body limits; 302 and `no-store` redirect behavior; and the
-configured public-origin and CORS boundary. T05/T08/T09 may implement against
-it without changing the contract.
+configured public-origin and CORS boundary. T05/T08/T09 implemented the
+original link contract; T24/T25 added the approved local operations.
 
 ## T14 status
 
@@ -116,7 +116,7 @@ refactoring guidance, and independently assignable A01–A07 quality tasks are i
 do not add hosted production infrastructure or infer public-service scope from
 the prototype’s use of the phrase production quality.
 
-## Final brownfield review handoff — 2026-09-03
+## Final brownfield review handoff (2026-09-03)
 
 STATUS: GO for the local/trusted-demo prototype; A06 is partial and A07 is not
 claimed complete until clean-checkout/CI evidence and the remaining quality-gap
@@ -144,8 +144,24 @@ checks, but this review did not execute a hosted CI job or a clean checkout of
 the uncommitted brownfield state. CI also has no separate lightweight
 dependency-review step.
 
-RISKS: Early body-limit/read-failure responses bypass the low-precedence access
-log filter. This is a local observability gap requiring a human decision if
-complete rejection logging is required; production code was not changed by
-this review. Public deployment remains blocked by the documented abuse,
+RISKS: Public deployment remains blocked by the documented abuse,
 destination-safety, lifecycle, backup, operations, and multi-instance gaps.
+
+## T18-T22 status at handoff
+
+T18 was approved on 2026-09-04 and authorized repository-contained T24
+orchestration and T25 local analytics within the existing local/trusted-demo,
+single-instance SQLite boundary. T24, T25, T19, T20, and T21 are complete.
+
+The T24 service durably coordinates runs, tasks, approvals, attempts, audit,
+metrics, and replanning but does not execute work or connect to the external
+agent runtime. T25 records best-effort short-code/UTC-time redirect events and
+serves bounded hourly aggregates; queue/storage failure may lose events, and no
+identity capture or automated retention/deletion exists.
+
+T22 is the documentation consistency pass. It synchronizes those capabilities
+into the requirements, architecture, data model, runbook, README, OpenAPI,
+handoff, and task references without adding public-service behavior. At the
+time of this handoff, T23 was not started; the current task record and
+[`final-release-review.md`](final-release-review.md) now record T23 complete
+and human-approved.

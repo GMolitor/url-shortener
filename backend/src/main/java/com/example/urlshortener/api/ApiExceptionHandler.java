@@ -3,6 +3,7 @@ package com.example.urlshortener.api;
 import com.example.urlshortener.domain.CodeGenerationExhaustedException;
 import com.example.urlshortener.domain.CodeNotFoundException;
 import com.example.urlshortener.domain.InvalidUrlException;
+import com.example.urlshortener.orchestration.OrchestrationException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import org.slf4j.Logger;
@@ -62,6 +63,11 @@ public class ApiExceptionHandler {
     ResponseEntity<ErrorResponse> storageFailure(DataAccessException exception, HttpServletRequest request) {
         logFailure("storage_failure", exception, request);
         return error(HttpStatus.INTERNAL_SERVER_ERROR, "STORAGE_FAILURE", "Storage operation failed", request);
+    }
+
+    @ExceptionHandler(OrchestrationException.class)
+    ResponseEntity<ErrorResponse> orchestrationFailure(OrchestrationException exception, HttpServletRequest request) {
+        return error(exception.status(), exception.errorCode(), exception.getMessage(), request);
     }
 
     @ExceptionHandler(Exception.class)

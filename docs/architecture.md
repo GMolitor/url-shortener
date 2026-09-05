@@ -6,9 +6,10 @@ The system is a local-first modular monolith:
 
 ```text
 Browser -> React UI -> Spring Boot API -> SQLite
-                              |
-                              v
-                       Structured logs/health
+                               |
+                               +-> Structured logs/health
+                               +-> bounded analytics writer
+                               +-> orchestration control-plane API
 ```
 
 The API is independently usable. No external service is required for local operation.
@@ -26,13 +27,19 @@ operations are intentionally outside the prototype boundary.
 - **Repository layer**: Spring JDBC operations against SQLite; SQL is isolated here.
 - **Configuration/observability**: environment settings, CORS, request IDs, structured logs, and health integration.
 - **SQLite**: durable source of truth for a single application instance.
+- **Analytics module**: redirect event publishing and time-window aggregate reads.
+- **Orchestration module**: durable run/task coordination, approvals, audit, and
+  terminal metrics for locally supplied workers.
 - **Data model contract**: [`data-model.md`](data-model.md) defines the MVP
-  `links` table, constraints, indexes, timestamps, and migration contract.
+  `links` table and the V2 local orchestration/analytics schema additions.
 
 ## API boundary
 
 - `POST /api/links`: create a link.
 - `GET /{code}`: redirect.
+- `GET /api/analytics/{code}`: local click aggregates.
+- `/api/orchestration/runs...`: local orchestration run/task coordination and
+  evidence operations.
 - `GET /actuator/health`: health.
 - Reserve `/api`, `/actuator`, `/assets`, and frontend routes from generated codes.
 
@@ -44,9 +51,31 @@ The published contract is [`openapi.yaml`](openapi.yaml).
 
 ## Data flow
 
-Creation validates input, generates a code, persists the mapping, and returns the persisted result. Redirect lookup queries by the unique indexed code and returns a 302 response. Destination URLs are never fetched by the service.
+Creation validates input, generates a code, persists the mapping, and returns the persisted result. Redirect lookup queries by the unique indexed code and returns a 302 response. After the response data is prepared, the redirect path offers a code/time event to the bounded asynchronous analytics publisher. Destination URLs are never fetched by the service.
 
-Analytics is not part of the MVP. If later introduced, redirect handling must emit non-blocking events so analytics cannot delay or break redirects.
+Analytics persistence is intentionally best-effort: queue-full and writer
+failures are isolated from redirect handling, and shutdown may drop queued events
+after the bounded graceful-drain period. Aggregates are hourly UTC buckets over a
+validated window of at most 366 days. Events contain only the short code and UTC
+time; there is no client identity, IP, user-agent, destination, retention job, or
+analytics UI.
+
+### Local orchestration boundary
+
+The repository contains a Spring Boot orchestration control plane. It durably
+stores runs, tasks, dependencies, attempts, approvals, graph versions, audit
+events, and terminal per-run metrics in SQLite. It validates dependency and
+fallback graphs, applies entry/task/exit gates, supports worker claims and
+results, bounded retry classification, fallback activation, cancellation,
+rollback evidence, policy guardrails, and graph-versioned replanning.
+
+The service records state and evidence; it does not execute task actions. A
+caller polls ready tasks, claims them, performs the work, and submits a result.
+There is no scheduler, queue, worker process, lease/heartbeat, timeout,
+automatic recovery, fairness policy, or external-agent runtime client. The
+external Orchestration Agent used for this development session is therefore a
+separate runtime concern, documented in
+[`orchestration-evidence.md`](orchestration-evidence.md).
 
 ## Cross-cutting architecture constraints
 
@@ -89,6 +118,13 @@ retry loops must not become unbounded or leak sensitive data. Request IDs,
 structured access/failure logs, timing, and database/migration health are
 cross-cutting responsibilities, with controlled responses for database
 failures.
+
+`V1__create_links.sql` owns link data and `V2__orchestration_and_analytics.sql`
+owns the local orchestration and click-event tables.
+
+The analytics writer is also bounded and asynchronous; it is allowed to lose
+events under queue saturation, writer failure, or forced shutdown so it cannot
+turn analytics storage into a redirect dependency.
 
 ### Public-deployment gate
 
@@ -166,13 +202,18 @@ ports, and encoding), concurrent creation, collision exhaustion, database
 failure handling, clean/latest migration paths, configured-origin behavior,
 CORS restrictions, and request/log redaction.
 
-**Optional:** redirect caching, WAL tuning, metrics, tracing, asynchronous analytics, PostgreSQL migration, distributed rate limiting, and horizontal scaling.
+**Optional/future:** redirect caching, WAL tuning, aggregate operational metrics,
+tracing, hosted analytics and retention, PostgreSQL migration, distributed rate
+limiting, and horizontal scaling. The local T25 analytics and T24 orchestration
+modules are implemented capabilities within the approved boundary.
 
 ## Known limitations
 
 - Anonymous creation is abuse-prone.
 - SQLite does not support high write concurrency or multiple application instances.
-- There is no link deletion, disabling, expiration, ownership, or analytics.
+- There is no link deletion, disabling, expiration, or ownership. Analytics has
+  no identity tracking, retention/deletion operation, dashboard, delivery
+  guarantee, or public-service isolation.
 - Destination safety is syntactic only.
 - Hosted production operations are not included; local correctness and
   diagnostics are included.

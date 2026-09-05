@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.urlshortener.domain.InvalidUrlException;
+import com.example.urlshortener.analytics.ClickEventPublisher;
 import com.example.urlshortener.domain.Link;
 import com.example.urlshortener.repository.LinkRepository;
 import com.example.urlshortener.service.LinkCreationService;
@@ -50,6 +51,9 @@ class LinkControllerTest {
 
     @MockBean
     private LinkRepository linkRepository;
+
+    @MockBean
+    private ClickEventPublisher clickEventPublisher;
 
     @Test
     void createsLinkUsingConfiguredOrigin() throws Exception {
@@ -168,6 +172,8 @@ class LinkControllerTest {
                 .andExpect(status().isFound())
                 .andExpect(header().string("Location", link.destinationUrl()))
                 .andExpect(header().string("Cache-Control", "no-store"));
+        org.mockito.Mockito.verify(clickEventPublisher)
+                .publish(org.mockito.ArgumentMatchers.argThat(event -> event.code().equals(link.code())));
     }
 
     @Test

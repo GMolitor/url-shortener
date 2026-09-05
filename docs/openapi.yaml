@@ -9,6 +9,8 @@ servers:
 tags:
   - name: Links
   - name: Health
+  - name: Analytics
+  - name: Orchestration
 paths:
   /api/links:
     post:
@@ -39,6 +41,24 @@ paths:
       x-limits:
         maxRequestBodyBytes: 4096
         maxUrlCharacters: 2048
+  /api/analytics/{code}:
+    get:
+      operationId: getAnalytics
+      tags: [Analytics]
+      summary: Read local click aggregates
+      description: Returns code/time-derived totals and hourly UTC buckets. Events are best-effort and may be lost when the bounded asynchronous writer is overloaded or unavailable.
+      parameters:
+        - $ref: '#/components/parameters/Code'
+        - $ref: '#/components/parameters/AnalyticsFrom'
+        - $ref: '#/components/parameters/AnalyticsTo'
+      responses:
+        '200':
+          description: Aggregate result, including an empty result for a valid code/window with no events
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AnalyticsResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '500': { $ref: '#/components/responses/ServerError' }
   /{code}:
     get:
       operationId: redirectToDestination
@@ -58,6 +78,247 @@ paths:
               schema: { type: string, example: no-store }
         '404': { $ref: '#/components/responses/NotFound' }
         '400': { $ref: '#/components/responses/BadRequest' }
+  /api/orchestration/runs:
+    post:
+      operationId: createOrchestrationRun
+      tags: [Orchestration]
+      summary: Create a local orchestration run
+      description: Creates a durable PLANNED run from a validated task graph. The service records and coordinates state but does not execute task actions.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateRunRequest' }
+      responses:
+        '201':
+          description: Run created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RunData' }
+        '400': { $ref: '#/components/responses/OrchestrationBadRequest' }
+        '413': { $ref: '#/components/responses/ContentTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /api/orchestration/runs/{runId}:
+    get:
+      operationId: getOrchestrationRun
+      tags: [Orchestration]
+      summary: Read a local orchestration run
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: Run data
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RunData' }
+        '404': { $ref: '#/components/responses/OrchestrationNotFound' }
+  /api/orchestration/runs/{runId}/ready-tasks:
+    get:
+      operationId: getReadyOrchestrationTasks
+      tags: [Orchestration]
+      summary: List ready tasks
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: Tasks currently in READY state
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/OrchestrationTask' }
+        '404': { $ref: '#/components/responses/OrchestrationNotFound' }
+  /api/orchestration/runs/{runId}/metrics:
+    get:
+      operationId: getOrchestrationMetrics
+      tags: [Orchestration]
+      summary: Read terminal per-run metrics
+      description: Metrics are written on terminal outcomes. Availability for an active run is not guaranteed by the implementation.
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: Metrics row when available
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrchestrationMetric' }
+        '404': { $ref: '#/components/responses/OrchestrationNotFound' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /api/orchestration/runs/{runId}/audit-events:
+    get:
+      operationId: getOrchestrationAuditEvents
+      tags: [Orchestration]
+      summary: Read orchestration audit events
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: Bounded audit event records
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/OrchestrationAuditEvent' }
+        '404': { $ref: '#/components/responses/OrchestrationNotFound' }
+  /api/orchestration/runs/{runId}/attempts:
+    get:
+      operationId: getOrchestrationAttempts
+      tags: [Orchestration]
+      summary: Read all task attempts
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: Attempt records
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/OrchestrationAttempt' }
+        '404': { $ref: '#/components/responses/OrchestrationNotFound' }
+  /api/orchestration/runs/{runId}/tasks/{taskKey}/attempts:
+    get:
+      operationId: getOrchestrationTaskAttempts
+      tags: [Orchestration]
+      summary: Read attempts for one task
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+        - $ref: '#/components/parameters/TaskKey'
+      responses:
+        '200':
+          description: Attempt records for the task
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/OrchestrationAttempt' }
+        '404': { $ref: '#/components/responses/OrchestrationNotFound' }
+  /api/orchestration/runs/{runId}/start:
+    post:
+      operationId: startOrchestrationRun
+      tags: [Orchestration]
+      summary: Start an entry-approved run
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200': { $ref: '#/components/responses/RunDataResponse' }
+        '404': { $ref: '#/components/responses/OrchestrationNotFound' }
+        '409': { $ref: '#/components/responses/OrchestrationConflict' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /api/orchestration/runs/{runId}/approvals:
+    post:
+      operationId: approveOrchestrationCheckpoint
+      tags: [Orchestration]
+      summary: Record an orchestration approval decision
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApprovalRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/RunDataResponse' }
+        '400': { $ref: '#/components/responses/OrchestrationBadRequest' }
+        '404': { $ref: '#/components/responses/OrchestrationNotFound' }
+        '409': { $ref: '#/components/responses/OrchestrationConflict' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+  /api/orchestration/runs/{runId}/tasks/{taskKey}/claim:
+    post:
+      operationId: claimOrchestrationTask
+      tags: [Orchestration]
+      summary: Claim a ready task
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+        - $ref: '#/components/parameters/TaskKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClaimRequest' }
+      responses:
+        '200':
+          description: Claimed task
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrchestrationTask' }
+        '400': { $ref: '#/components/responses/OrchestrationBadRequest' }
+        '404': { $ref: '#/components/responses/OrchestrationNotFound' }
+        '409': { $ref: '#/components/responses/OrchestrationConflict' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+  /api/orchestration/runs/{runId}/tasks/{taskKey}/result:
+    post:
+      operationId: submitOrchestrationTaskResult
+      tags: [Orchestration]
+      summary: Submit a task result
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+        - $ref: '#/components/parameters/TaskKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResultRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/RunDataResponse' }
+        '400': { $ref: '#/components/responses/OrchestrationBadRequest' }
+        '404': { $ref: '#/components/responses/OrchestrationNotFound' }
+        '409': { $ref: '#/components/responses/OrchestrationConflict' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+  /api/orchestration/runs/{runId}/cancel:
+    post:
+      operationId: cancelOrchestrationRun
+      tags: [Orchestration]
+      summary: Safely stop a run
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StopRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/RunDataResponse' }
+        '404': { $ref: '#/components/responses/OrchestrationNotFound' }
+        '409': { $ref: '#/components/responses/OrchestrationConflict' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+  /api/orchestration/runs/{runId}/rollback:
+    post:
+      operationId: rollbackOrchestrationRun
+      tags: [Orchestration]
+      summary: Record rollback state and metadata
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RollbackRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/RunDataResponse' }
+        '404': { $ref: '#/components/responses/OrchestrationNotFound' }
+        '409': { $ref: '#/components/responses/OrchestrationConflict' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+  /api/orchestration/runs/{runId}/replans:
+    post:
+      operationId: replanOrchestrationRun
+      tags: [Orchestration]
+      summary: Add tasks to an active run
+      description: Requires the current graph version and a succeeded trigger task; the service increments the graph version transactionally.
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReplanRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/RunDataResponse' }
+        '400': { $ref: '#/components/responses/OrchestrationBadRequest' }
+        '404': { $ref: '#/components/responses/OrchestrationNotFound' }
+        '409': { $ref: '#/components/responses/OrchestrationConflict' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
   /actuator/health:
     get:
       operationId: getHealth
@@ -86,6 +347,32 @@ components:
         pattern: '^[A-Za-z0-9]{7}$'
         minLength: 7
         maxLength: 7
+    RunId:
+      name: runId
+      in: path
+      required: true
+      description: Durable run identifier returned by run creation
+      schema: { type: string }
+    TaskKey:
+      name: taskKey
+      in: path
+      required: true
+      description: Orchestration task key
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$'
+    AnalyticsFrom:
+      name: from
+      in: query
+      required: false
+      description: Inclusive UTC RFC-3339 start; defaults to 24 hours before `to`
+      schema: { type: string, format: date-time }
+    AnalyticsTo:
+      name: to
+      in: query
+      required: false
+      description: Exclusive UTC RFC-3339 end; defaults to the server UTC clock
+      schema: { type: string, format: date-time }
   schemas:
     CreateLinkRequest:
       type: object
@@ -121,7 +408,7 @@ components:
         status: { type: integer, minimum: 400, maximum: 599 }
         errorCode:
           type: string
-          enum: [INVALID_REQUEST, INVALID_URL, CODE_NOT_FOUND, REQUEST_TOO_LARGE, UNSUPPORTED_MEDIA_TYPE, STORAGE_FAILURE, SERVICE_UNAVAILABLE]
+          enum: [INVALID_REQUEST, INVALID_URL, CODE_NOT_FOUND, REQUEST_TOO_LARGE, UNSUPPORTED_MEDIA_TYPE, STORAGE_FAILURE, SERVICE_UNAVAILABLE, ORCHESTRATION_INVALID, ORCHESTRATION_NOT_FOUND, ORCHESTRATION_CONFLICT]
         message: { type: string, description: Safe message without stack traces or SQL details }
         requestId: { type: string }
         timestamp: { type: string, format: date-time, description: UTC RFC-3339 instant with Z offset }
@@ -130,9 +417,206 @@ components:
       properties:
         status: { type: string, enum: [UP, DOWN] }
         components: { type: object, additionalProperties: true }
+    AnalyticsResponse:
+      type: object
+      additionalProperties: false
+      required: [code, totalClicks, from, to, buckets]
+      properties:
+        code: { type: string, pattern: '^[A-Za-z0-9]{7}$' }
+        totalClicks: { type: integer, format: int64, minimum: 0 }
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+        buckets:
+          type: array
+          items: { $ref: '#/components/schemas/AnalyticsBucket' }
+    AnalyticsBucket:
+      type: object
+      additionalProperties: false
+      required: [start, clicks]
+      properties:
+        start: { type: string, format: date-time }
+        clicks: { type: integer, format: int64, minimum: 0 }
+    CreateRunRequest:
+      type: object
+      additionalProperties: false
+      required: [name, tasks]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        tasks:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: { $ref: '#/components/schemas/OrchestrationTaskSpec' }
+    OrchestrationTaskSpec:
+      type: object
+      additionalProperties: false
+      required: [taskKey, description, action, dependsOn, highImpact, maxAttempts]
+      properties:
+        taskKey: { type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$' }
+        description: { type: string, minLength: 1, maxLength: 240 }
+        action: { type: string, minLength: 1, maxLength: 80 }
+        dependsOn:
+          type: array
+          maxItems: 32
+          items: { type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$' }
+        highImpact: { type: boolean }
+        maxAttempts: { type: integer, minimum: 1, maximum: 3 }
+        fallbackTaskKey: { type: [string, 'null'] }
+    OrchestrationRun:
+      type: object
+      additionalProperties: false
+      required: [id, name, state, graphVersion, entryApproved, createdAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        state: { type: string, enum: [PLANNED, READY, RUNNING, WAITING_EXIT_APPROVAL, COMPLETE, FAILED, CANCELLED, ROLLED_BACK] }
+        graphVersion: { type: integer, minimum: 1 }
+        entryApproved: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        startedAt: { type: [string, 'null'], format: date-time }
+        completedAt: { type: [string, 'null'], format: date-time }
+        outcome: { type: [string, 'null'] }
+        rollbackMetadata: { type: [string, 'null'] }
+        lastError: { type: [string, 'null'] }
+    OrchestrationTask:
+      type: object
+      additionalProperties: false
+      required: [id, runId, taskKey, description, action, state, highImpact, maxAttempts, attempts]
+      properties:
+        id: { type: string }
+        runId: { type: string }
+        taskKey: { type: string }
+        description: { type: string }
+        action: { type: string }
+        state: { type: string, enum: [PENDING, WAITING_APPROVAL, READY, RUNNING, RETRY_WAITING, SUCCEEDED, FAILED, CANCELLED] }
+        highImpact: { type: boolean }
+        maxAttempts: { type: integer }
+        attempts: { type: integer, minimum: 0 }
+        workerId: { type: [string, 'null'] }
+        startedAt: { type: [string, 'null'], format: date-time }
+        completedAt: { type: [string, 'null'], format: date-time }
+        outputSummary: { type: [string, 'null'] }
+        errorCode: { type: [string, 'null'] }
+        fallbackTaskKey: { type: [string, 'null'] }
+        rollbackMetadata: { type: [string, 'null'] }
+    OrchestrationApproval:
+      type: object
+      additionalProperties: false
+      required: [id, checkpoint, decision, approvedBy, createdAt]
+      properties:
+        id: { type: string }
+        taskKey: { type: [string, 'null'] }
+        checkpoint: { type: string, enum: [ENTRY, TASK, EXIT] }
+        decision: { type: string, enum: [APPROVED, REJECTED] }
+        approvedBy: { type: string }
+        reason: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
+    RunData:
+      type: object
+      additionalProperties: false
+      required: [run, tasks, approvals]
+      properties:
+        run: { $ref: '#/components/schemas/OrchestrationRun' }
+        tasks:
+          type: array
+          items: { $ref: '#/components/schemas/OrchestrationTask' }
+        approvals:
+          type: array
+          items: { $ref: '#/components/schemas/OrchestrationApproval' }
+    ApprovalRequest:
+      type: object
+      additionalProperties: false
+      required: [checkpoint, decision, approvedBy]
+      properties:
+        checkpoint: { type: string, enum: [ENTRY, TASK, EXIT] }
+        taskKey: { type: [string, 'null'] }
+        decision: { type: string, enum: [APPROVED, REJECTED] }
+        approvedBy: { type: string, minLength: 1, maxLength: 80 }
+        reason: { type: [string, 'null'], maxLength: 160 }
+    ClaimRequest:
+      type: object
+      additionalProperties: false
+      required: [workerId]
+      properties:
+        workerId: { type: string, minLength: 1, maxLength: 80 }
+    ResultRequest:
+      type: object
+      additionalProperties: false
+      required: [workerId, success, retryable]
+      properties:
+        workerId: { type: string, minLength: 1, maxLength: 80 }
+        success: { type: boolean }
+        retryable: { type: boolean }
+        outputSummary: { type: [string, 'null'], maxLength: 512 }
+        errorCode: { type: [string, 'null'], maxLength: 80 }
+        rollbackMetadata: { type: [string, 'null'], maxLength: 512 }
+    StopRequest:
+      type: object
+      additionalProperties: false
+      required: [actor]
+      properties:
+        actor: { type: string, minLength: 1, maxLength: 80 }
+        reason: { type: [string, 'null'], maxLength: 160 }
+    RollbackRequest:
+      type: object
+      additionalProperties: false
+      required: [actor]
+      properties:
+        actor: { type: string, minLength: 1, maxLength: 80 }
+        reason: { type: [string, 'null'], maxLength: 160 }
+        metadata: { type: [string, 'null'], maxLength: 512 }
+    ReplanRequest:
+      type: object
+      additionalProperties: false
+      required: [baseGraphVersion, triggerTaskKey, decision, tasks]
+      properties:
+        baseGraphVersion: { type: integer, minimum: 1 }
+        triggerTaskKey: { type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$' }
+        decision: { type: string, minLength: 1, maxLength: 240 }
+        tasks:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: { $ref: '#/components/schemas/OrchestrationTaskSpec' }
+    OrchestrationAttempt:
+      type: object
+      additionalProperties: false
+      required: [attemptNo, taskKey, state, workerId, startedAt]
+      properties:
+        attemptNo: { type: integer, minimum: 1 }
+        taskKey: { type: string }
+        state: { type: string, enum: [RUNNING, SUCCEEDED, FAILED] }
+        workerId: { type: string }
+        startedAt: { type: string, format: date-time }
+        endedAt: { type: [string, 'null'], format: date-time }
+        errorCode: { type: [string, 'null'] }
+        outcomeSummary: { type: [string, 'null'] }
+    OrchestrationAuditEvent:
+      type: object
+      additionalProperties: false
+      required: [eventType, actor, detail, occurredAt]
+      properties:
+        taskKey: { type: [string, 'null'] }
+        eventType: { type: string }
+        fromState: { type: [string, 'null'] }
+        toState: { type: [string, 'null'] }
+        actor: { type: string }
+        detail: { type: string }
+        occurredAt: { type: string, format: date-time }
+    OrchestrationMetric:
+      type: object
+      additionalProperties: false
+      required: [outcome, successRate, retryFrequency, rollbackFrequency, mttrMs, endToEndLatencyMs]
+      properties:
+        outcome: { type: string }
+        successRate: { type: number, format: double }
+        retryFrequency: { type: number, format: double }
+        rollbackFrequency: { type: number, format: double }
+        mttrMs: { type: integer, format: int64 }
+        endToEndLatencyMs: { type: integer, format: int64 }
   responses:
     BadRequest:
-      description: INVALID_REQUEST for malformed JSON/missing or unknown fields; INVALID_URL for a rejected destination URL; INVALID_REQUEST for an invalid code path
+      description: INVALID_REQUEST for malformed JSON, missing or unknown fields, invalid analytics windows, or invalid code paths; INVALID_URL for a rejected destination URL; ORCHESTRATION_INVALID for an invalid orchestration request
       content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
     NotFound:
       description: CODE_NOT_FOUND because the code does not exist
@@ -148,6 +632,18 @@ components:
       content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
     ServiceUnavailable:
       description: SERVICE_UNAVAILABLE because the service or database is unavailable
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    RunDataResponse:
+      description: Updated orchestration run data
+      content: { application/json: { schema: { $ref: '#/components/schemas/RunData' } } }
+    OrchestrationBadRequest:
+      description: ORCHESTRATION_INVALID because the orchestration input violates its contract or local policy
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    OrchestrationNotFound:
+      description: ORCHESTRATION_NOT_FOUND because the run or task does not exist
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    OrchestrationConflict:
+      description: ORCHESTRATION_CONFLICT because the current run/task state, worker, or graph version does not permit the operation
       content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
 x-contract:
   publicOrigin: PUBLIC_ORIGIN
